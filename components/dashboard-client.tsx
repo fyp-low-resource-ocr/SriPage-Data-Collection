@@ -71,7 +71,11 @@ export function DashboardClient({
               <h3>{project.name}</h3>
               <p>{project.sourceOriginalName}</p>
               <div className="project-meta">
-                <span>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(project.updatedAt))}</span>
+                <span>
+                  {new Intl.DateTimeFormat("en-GB", {
+                    dateStyle: "medium",
+                  }).format(new Date(project.createdAt))}
+                </span>
                 <span className="field-count">{project.annotations.length} fields</span>
               </div>
             </Link>
