@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SriDoc Studio
 
-## Getting Started
+A local Next.js application for annotating blank PDF forms and generating synthetic handwritten PDF/JSON datasets in Sinhala, Tamil, and English.
 
-First, run the development server:
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open the local URL shown by Next.js. For a production run:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm build
+pnpm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Projects, source PDFs, annotations, value drafts, and fonts are stored in `.local-data` by default. Set `SYNTH_DATA_DIR` to use a different application-data folder:
 
-## Learn More
+```bash
+SYNTH_DATA_DIR=/path/to/sridoc-data pnpm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Workflow
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Create a project and upload a blank multi-page PDF.
+2. For each field, draw the printed label box and then its answer region.
+3. Enter the exact printed label, choose its language, and enable multiline layout when needed.
+4. In **Generate**, select one answer language and enter one value per field.
+5. Upload one or more matching `.ttf` or `.otf` handwriting fonts.
+6. Select the font variants, choose a seed, and generate the dataset.
+7. Download the PDF and JSON file for each font separately.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The JSON export uses normalized top-left bounding boxes and includes the source PDF hash, font hash, seed, augmentation settings, page dimensions, printed-label boxes, and tight rendered-answer boxes.
 
-## Deploy on Vercel
+## Quality checks
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm test
+pnpm lint
+pnpm exec tsc --noEmit
+pnpm build
+```
