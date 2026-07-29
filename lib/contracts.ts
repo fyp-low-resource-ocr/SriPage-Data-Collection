@@ -38,7 +38,7 @@ export type AugmentationConfig = z.infer<typeof augmentationSchema>;
 export const defaultAugmentation: AugmentationConfig = {
   positionJitter: 0.018,
   rotationDegrees: 1.4,
-  sizeVariation: 0.08,
+  sizeVariation: 0,
   inkVariation: 0.12,
   blur: 0.35,
   noise: 2.5,
@@ -59,6 +59,7 @@ export const generationRequestSchema = z.object({
   answerLanguage: languageSchema,
   values: z.record(z.string(), z.string().max(10_000)),
   fontIds: z.array(z.string().min(1)).min(1),
+  fontSize: z.number().min(6).max(72),
   seed: z.number().int().nonnegative(),
   augmentation: augmentationSchema,
 });
@@ -123,6 +124,7 @@ export type DatasetExport = {
   generation: {
     seed: number;
     answerLanguage: Language;
+    fontSize: number;
     font: Pick<FontAsset, "id" | "name" | "language" | "sha256">;
     augmentation: AugmentationConfig;
   };

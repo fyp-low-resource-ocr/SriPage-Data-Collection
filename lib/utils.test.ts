@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { clampBox, datasetFilename, mulberry32, normalizeBox, rotatedAabb } from "./utils";
+import {
+  clampBox,
+  datasetFilename,
+  mulberry32,
+  normalizeBox,
+  rotatedAabb,
+  rotatedAabbFromOrigin,
+} from "./utils";
 
 describe("geometry helpers", () => {
   it("normalizes boxes regardless of draw direction", () => {
@@ -23,6 +30,14 @@ describe("geometry helpers", () => {
     const box = rotatedAabb(10, 20, 30, 10, Math.PI / 2);
     expect(box.x).toBeCloseTo(20);
     expect(box.y).toBeCloseTo(10);
+    expect(box.width).toBeCloseTo(10);
+    expect(box.height).toBeCloseTo(30);
+  });
+
+  it("calculates rotated text bounds around its drawing origin", () => {
+    const box = rotatedAabbFromOrigin(10, 20, 30, 10, Math.PI / 2);
+    expect(box.x).toBeCloseTo(0);
+    expect(box.y).toBeCloseTo(20);
     expect(box.width).toBeCloseTo(10);
     expect(box.height).toBeCloseTo(30);
   });

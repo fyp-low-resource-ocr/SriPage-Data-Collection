@@ -33,8 +33,24 @@ describe("public contracts", () => {
       answerLanguage: "ta",
       values: { "field-1": "பெயர்" },
       fontIds: [],
+      fontSize: 12,
       seed: 5,
       augmentation: defaultAugmentation,
     }).success).toBe(false);
+  });
+
+  it("limits the user-selected letter size to a readable range", () => {
+    const request = {
+      projectId: "project-1",
+      answerLanguage: "en",
+      values: { "field-1": "Name" },
+      fontIds: ["font-1"],
+      fontSize: 12,
+      seed: 5,
+      augmentation: defaultAugmentation,
+    };
+    expect(generationRequestSchema.safeParse(request).success).toBe(true);
+    expect(generationRequestSchema.safeParse({ ...request, fontSize: 5 }).success).toBe(false);
+    expect(generationRequestSchema.safeParse({ ...request, fontSize: 73 }).success).toBe(false);
   });
 });

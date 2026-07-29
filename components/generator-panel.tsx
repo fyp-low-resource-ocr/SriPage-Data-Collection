@@ -1,6 +1,6 @@
 "use client";
 
-import { FileJson2, FileText, Plus, Sparkles, Upload } from "lucide-react";
+import { AlertTriangle, FileJson2, FileText, Plus, Sparkles, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import type {
   AugmentationConfig,
@@ -27,6 +27,7 @@ export function GeneratorPanel({
   const [answerLanguage, setAnswerLanguage] = useState<Language>(project.answerLanguage);
   const [values, setValues] = useState<Record<string, string>>(project.draftValues);
   const [selectedFontIds, setSelectedFontIds] = useState<string[]>([]);
+  const [fontSize, setFontSize] = useState(12);
   const [seed, setSeed] = useState(() => Math.floor(Date.now() / 1000) >>> 0);
   const [augmentation, setAugmentation] = useState<AugmentationConfig>(defaultAugmentation);
   const [busy, setBusy] = useState(false);
@@ -103,8 +104,9 @@ export function GeneratorPanel({
       answerLanguage,
       values,
       fontIds: selectedFontIds,
+      fontSize,
       seed,
-      augmentation,
+      augmentation: { ...augmentation, sizeVariation: 0 },
     };
     const validated = generationRequestSchema.safeParse(request);
     if (!validated.success) {
@@ -229,6 +231,19 @@ export function GeneratorPanel({
         <div className="content-card-body form-grid">
           <div className="row">
             <div className="field">
+              <label htmlFor="font-size">Letter size (pt)</label>
+              <input
+                className="input"
+                id="font-size"
+                type="number"
+                min={6}
+                max={72}
+                step={1}
+                value={fontSize}
+                onChange={(event) => setFontSize(Number(event.target.value))}
+              />
+            </div>
+            <div className="field">
               <label htmlFor="seed">Random seed</label>
               <input className="input" id="seed" type="number" min={0} max={4294967295} value={seed} onChange={(event) => setSeed(Number(event.target.value) >>> 0)} />
             </div>
@@ -240,6 +255,9 @@ export function GeneratorPanel({
               <label htmlFor="rotation">Writing rotation</label>
               <input className="input" id="rotation" type="range" min={0} max={3} step={.1} value={augmentation.rotationDegrees} onChange={(event) => setAugmentation({ ...augmentation, rotationDegrees: Number(event.target.value) })} />
             </div>
+          </div>
+          <div className="notice">
+            The selected letter size stays constant in every answer. Text outside an annotated answer area will be hidden and reported after generation.
           </div>
           {error && <div className="error">{error}</div>}
           {busy && (
@@ -265,15 +283,25 @@ export function GeneratorPanel({
           </div>
           <div className="content-card-body results">
             {results.map((result) => (
-              <div className="result-row" key={result.font.id}>
-                <div>
-                  <strong>{result.font.name}</strong>
-                  <span>{result.fieldCount} answer boxes · seed {seed}</span>
+              <div className="result-item" key={result.font.id}>
+                <div className="result-row">
+                  <div>
+                    <strong>{result.font.name}</strong>
+                    <span>{result.fieldCount} answer boxes · {result.fontSize} pt · seed {result.seed}</span>
+                  </div>
+                  <div className="result-actions">
+                    <a className="button button-secondary button-small" href={result.pdfUrl} download={`${result.filename}.pdf`}><FileText size={14} /> PDF</a>
+                    <a className="button button-secondary button-small" href={result.jsonUrl} download={`${result.filename}.json`}><FileJson2 size={14} /> JSON</a>
+                  </div>
                 </div>
-                <div className="result-actions">
-                  <a className="button button-secondary button-small" href={result.pdfUrl} download={`${result.filename}.pdf`}><FileText size={14} /> PDF</a>
-                  <a className="button button-secondary button-small" href={result.jsonUrl} download={`${result.filename}.json`}><FileJson2 size={14} /> JSON</a>
-                </div>
+                {result.overflowWarnings.length > 0 && (
+                  <div className="overflow-warning" role="status">
+                    <AlertTriangle size={15} />
+                    <span>
+                      {result.overflowWarnings.length} answer{result.overflowWarnings.length === 1 ? "" : "s"} overflowed and {result.overflowWarnings.length === 1 ? "was" : "were"} clipped: {result.overflowWarnings.join(" ")}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -7,8 +7,8 @@ import type {
   ProjectRecord,
 } from "../contracts";
 import { scanAlphaBounds } from "../generation";
-import { fitText } from "../text-layout";
-import { datasetFilename, mulberry32, rotatedAabb } from "../utils";
+import { layoutText } from "../text-layout";
+import { datasetFilename, mulberry32, rotatedAabbFromOrigin } from "../utils";
 
 export type GeneratedVariant = {
   font: FontAsset;
@@ -16,6 +16,9 @@ export type GeneratedVariant = {
   pdfUrl: string;
   jsonUrl: string;
   fieldCount: number;
+  fontSize: number;
+  seed: number;
+  overflowWarnings: string[];
 };
 
 function applyPageDegradation(
@@ -84,6 +87,7 @@ export async function generateDatasetVariants({
       const random = mulberry32((request.seed + fontIndex * 2654435761) >>> 0);
       const pages: DatasetExport["pages"] = [];
       const fields: FieldExport[] = [];
+      const overflowWarnings: string[] = [];
       let outputPdf: InstanceType<typeof jsPDF> | null = null;
 
       try {
@@ -121,22 +125,16 @@ export async function generateDatasetVariants({
               height: field.answerRegion.height * canvas.height,
             };
             const padding = Math.max(3, Math.min(region.width, region.height) * 0.04);
-            const preferred = Math.max(18, Math.min(region.height * (field.multiline ? .38 : .68), 64));
-            const minimum = Math.max(12, Math.min(20, region.height * .24));
-            const sizeFactor = 1 + (random() * 2 - 1) * request.augmentation.sizeVariation;
-            const layout = fitText({
+            const renderScale = renderViewport.width / pointViewport.width;
+            const layout = layoutText({
               context,
               text: value,
               fontFamily: family,
               maxWidth: region.width - padding * 2,
               maxHeight: region.height - padding * 2,
               multiline: field.multiline,
-              preferredSize: preferred * sizeFactor,
-              minimumSize: minimum,
+              fontSize: request.fontSize * renderScale,
             });
-            if (!layout.fits) {
-              throw new Error(`“${field.labelText}” does not fit its answer area with ${font.name}.`);
-            }
 
             const textLayer = document.createElement("canvas");
             textLayer.width = canvas.width;
@@ -147,7 +145,19 @@ export async function generateDatasetVariants({
             const jitterY = (random() * 2 - 1) * region.height * request.augmentation.positionJitter;
             const originX = region.x + padding + jitterX;
             const originY = region.y + padding + jitterY;
+            const estimated = rotatedAabbFromOrigin(originX, originY, layout.width, layout.height, angle);
+            const overflows = !layout.fits
+              || estimated.x < region.x
+              || estimated.y < region.y
+              || estimated.x + estimated.width > region.x + region.width
+              || estimated.y + estimated.height > region.y + region.height;
+            if (overflows) {
+              overflowWarnings.push(`“${field.labelText}” on page ${pageIndex + 1} was clipped.`);
+            }
             textContext.save();
+            textContext.beginPath();
+            textContext.rect(region.x, region.y, region.width, region.height);
+            textContext.clip();
             textContext.translate(originX, originY);
             textContext.rotate(angle);
             textContext.font = `${layout.fontSize}px "${family}"`;
@@ -156,7 +166,6 @@ export async function generateDatasetVariants({
             layout.lines.forEach((line, lineIndex) => textContext.fillText(line, 0, lineIndex * layout.lineHeight));
             textContext.restore();
 
-            const estimated = rotatedAabb(originX, originY, layout.width, layout.height, angle);
             const scanPadding = layout.fontSize * .7;
             const bounds = scanAlphaBounds(
               textContext,
@@ -216,6 +225,7 @@ export async function generateDatasetVariants({
           generation: {
             seed: request.seed,
             answerLanguage: request.answerLanguage,
+            fontSize: request.fontSize,
             font: { id: font.id, name: font.name, language: font.language, sha256: font.sha256 },
             augmentation: request.augmentation,
           },
@@ -228,6 +238,9 @@ export async function generateDatasetVariants({
           pdfUrl: URL.createObjectURL(outputPdf.output("blob")),
           jsonUrl: URL.createObjectURL(new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" })),
           fieldCount: fields.length,
+          fontSize: request.fontSize,
+          seed: request.seed,
+          overflowWarnings,
         });
       } finally {
         document.fonts.delete(face);

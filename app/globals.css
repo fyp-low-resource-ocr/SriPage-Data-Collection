@@ -183,10 +183,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .font-option span { color: var(--muted); font-size: 10px; }
 .generation-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .results { display: grid; gap: 10px; }
-.result-row { border: 1px solid var(--line); border-radius: 10px; padding: 13px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.result-item { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.result-row { padding: 13px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .result-row strong { display: block; font-size: 12px; }
 .result-row span { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
 .result-actions { display: flex; gap: 7px; }
+.overflow-warning { padding: 10px 13px; border-top: 1px solid #f0d8ad; background: #fff8eb; color: #72501b; display: flex; align-items: flex-start; gap: 8px; font-size: 11px; line-height: 1.45; }
+.overflow-warning svg { flex: 0 0 auto; margin-top: 1px; }
 .notice { padding: 12px; border-radius: 9px; background: #fff8eb; border: 1px solid #f0d8ad; color: #72501b; font-size: 11px; line-height: 1.45; }
 .success { padding: 12px; border-radius: 9px; background: #eff8f2; border: 1px solid #c6e0d0; color: var(--forest); font-size: 11px; }
 .spinner { width: 15px; height: 15px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }

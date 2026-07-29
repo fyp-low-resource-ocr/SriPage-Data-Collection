@@ -63,6 +63,34 @@ export function rotatedAabb(
   };
 }
 
+export function rotatedAabbFromOrigin(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  angleRadians: number,
+) {
+  const cosine = Math.cos(angleRadians);
+  const sine = Math.sin(angleRadians);
+  const corners = [
+    [0, 0],
+    [width, 0],
+    [width, height],
+    [0, height],
+  ].map(([px, py]) => [
+    x + px * cosine - py * sine,
+    y + px * sine + py * cosine,
+  ]);
+  const xs = corners.map(([px]) => px);
+  const ys = corners.map(([, py]) => py);
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
+}
+
 export function mulberry32(seed: number) {
   let state = seed >>> 0;
   return () => {

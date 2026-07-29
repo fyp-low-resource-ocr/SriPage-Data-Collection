@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitText } from "./text-layout";
+import { layoutText } from "./text-layout";
 
 function fakeContext() {
   let fontSize = 16;
@@ -11,47 +11,45 @@ function fakeContext() {
 }
 
 describe("text fitting", () => {
-  it("shrinks a single line until it fits", () => {
-    const result = fitText({
+  it("keeps the selected font size when a single line overflows", () => {
+    const result = layoutText({
       context: fakeContext(),
       text: "1234567890",
       fontFamily: "Test",
-      maxWidth: 60,
+      maxWidth: 50,
       maxHeight: 30,
       multiline: false,
-      preferredSize: 20,
-      minimumSize: 10,
+      fontSize: 20,
     });
-    expect(result.fits).toBe(true);
-    expect(result.fontSize).toBe(12);
+    expect(result.fits).toBe(false);
+    expect(result.fontSize).toBe(20);
   });
 
   it("wraps multiline values within the available region", () => {
-    const result = fitText({
+    const result = layoutText({
       context: fakeContext(),
       text: "one two three four",
       fontFamily: "Test",
       maxWidth: 60,
-      maxHeight: 80,
+      maxHeight: 100,
       multiline: true,
-      preferredSize: 20,
-      minimumSize: 10,
+      fontSize: 20,
     });
     expect(result.fits).toBe(true);
     expect(result.lines.length).toBeGreaterThan(1);
   });
 
-  it("reports when minimum-size text still cannot fit", () => {
-    const result = fitText({
+  it("reports when fixed-size text cannot fit vertically", () => {
+    const result = layoutText({
       context: fakeContext(),
-      text: "a very long single line that cannot fit",
+      text: "one two three four",
       fontFamily: "Test",
-      maxWidth: 20,
+      maxWidth: 60,
       maxHeight: 20,
-      multiline: false,
-      preferredSize: 18,
-      minimumSize: 10,
+      multiline: true,
+      fontSize: 18,
     });
     expect(result.fits).toBe(false);
+    expect(result.fontSize).toBe(18);
   });
 });

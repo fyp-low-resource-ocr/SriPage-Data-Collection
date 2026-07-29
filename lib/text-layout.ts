@@ -51,15 +51,14 @@ export function wrapText(context: CanvasRenderingContext2D, text: string, maxWid
   return lines;
 }
 
-export function fitText({
+export function layoutText({
   context,
   text,
   fontFamily,
   maxWidth,
   maxHeight,
   multiline,
-  preferredSize,
-  minimumSize,
+  fontSize,
 }: {
   context: CanvasRenderingContext2D;
   text: string;
@@ -67,27 +66,19 @@ export function fitText({
   maxWidth: number;
   maxHeight: number;
   multiline: boolean;
-  preferredSize: number;
-  minimumSize: number;
+  fontSize: number;
 }): TextLayout {
-  for (let fontSize = preferredSize; fontSize >= minimumSize; fontSize -= 1) {
-    context.font = `${fontSize}px "${fontFamily}"`;
-    const lines = multiline ? wrapText(context, text, maxWidth) : [text.replace(/\s*\n\s*/g, " ")];
-    const lineHeight = fontSize * 1.25;
-    const width = Math.max(0, ...lines.map((line) => context.measureText(line).width));
-    const height = lines.length * lineHeight;
-    if (width <= maxWidth && height <= maxHeight) {
-      return { fontSize, lineHeight, lines, width, height, fits: true };
-    }
-  }
-  context.font = `${minimumSize}px "${fontFamily}"`;
+  context.font = `${fontSize}px "${fontFamily}"`;
   const lines = multiline ? wrapText(context, text, maxWidth) : [text.replace(/\s*\n\s*/g, " ")];
+  const lineHeight = fontSize * 1.25;
+  const width = Math.max(0, ...lines.map((line) => context.measureText(line).width));
+  const height = lines.length * lineHeight;
   return {
-    fontSize: minimumSize,
-    lineHeight: minimumSize * 1.25,
+    fontSize,
+    lineHeight,
     lines,
-    width: Math.max(0, ...lines.map((line) => context.measureText(line).width)),
-    height: lines.length * minimumSize * 1.25,
-    fits: false,
+    width,
+    height,
+    fits: width <= maxWidth && height <= maxHeight,
   };
 }
