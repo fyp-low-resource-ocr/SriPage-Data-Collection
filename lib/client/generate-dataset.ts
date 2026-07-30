@@ -155,9 +155,9 @@ export async function generateDatasetVariants({
               overflowWarnings.push(`“${field.labelText}” on page ${pageIndex + 1} was clipped.`);
             }
             textContext.save();
-            textContext.beginPath();
-            textContext.rect(region.x, region.y, region.width, region.height);
-            textContext.clip();
+            // textContext.beginPath();
+            // textContext.rect(region.x, region.y, region.width, region.height);
+            // textContext.clip();
             textContext.translate(originX, originY);
             textContext.rotate(angle);
             textContext.font = `${layout.fontSize}px "${family}"`;
