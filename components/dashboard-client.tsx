@@ -39,7 +39,6 @@ export function DashboardClient({
         <AppBrand />
         <div className="topbar-status">
           <span><span className="status-dot" />Local workspace</span>
-          <span>PDF + JSON exports</span>
         </div>
       </header>
       <main className="page-wrap">
