@@ -8,34 +8,21 @@ on:
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
 jobs:
-  Deploy-Production:
+  deploy-production:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Install pnpm
-        run: npm install --global pnpm@10
-
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
       - name: Verify Vercel Authentication
         run: |
-          echo "Authenticated Vercel user:"
           vercel whoami --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: List Accessible Vercel Projects
-        run: |
-          echo "Accessible Vercel projects:"
-          vercel project ls --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Remove stale Vercel configuration
-        run: rm -rf .vercel
 
       - name: Pull Vercel Environment Information
         run: |
@@ -50,7 +37,7 @@ jobs:
             --prod \
             --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Deploy Project Artifacts to Vercel
+      - name: Deploy Project Artifacts
         run: |
           DEPLOYMENT_URL=$(vercel deploy \
             --prebuilt \
@@ -58,4 +45,4 @@ jobs:
             --token=${{ secrets.VERCEL_TOKEN }})
 
           echo "DEPLOYMENT SUCCESSFUL!"
-          echo "Live URL: $DEPLOYMENT_URL"
+          echo "Production URL: $DEPLOYMENT_URL"
