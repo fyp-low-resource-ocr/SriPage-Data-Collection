@@ -1,4 +1,4 @@
-name: Deploy Admin App Production
+name: Deploy Production
 
 on:
   push:
@@ -10,7 +10,7 @@ env:
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
 jobs:
-  deploy-production:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,45 +22,24 @@ jobs:
         with:
           node-version: 22
 
-      - name: Enable Corepack
-        run: |
-          npm install --global corepack@latest
-          corepack enable
-
-      - name: Install pnpm
-        run: |
-          corepack prepare pnpm@10 --activate
-          pnpm --version
-
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
       - name: Verify Vercel Authentication
-        run: |
-          vercel whoami --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel whoami --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Remove stale Vercel configuration
-        run: rm -rf .vercel
-
-      - name: Pull Vercel Environment Information
+      - name: Pull Vercel Project Settings
         run: |
           vercel pull \
             --yes \
             --environment=production \
             --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Build Project Artifacts
-        run: |
-          vercel build \
-            --prod \
-            --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy Project Artifacts
+      - name: Deploy Production
         run: |
           DEPLOYMENT_URL=$(vercel deploy \
-            --prebuilt \
             --prod \
+            --yes \
             --token=${{ secrets.VERCEL_TOKEN }})
 
-          echo "DEPLOYMENT SUCCESSFUL!"
           echo "Production URL: $DEPLOYMENT_URL"
