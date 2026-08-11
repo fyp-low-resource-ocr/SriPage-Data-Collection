@@ -3,6 +3,6 @@ import { listFormCategories } from "@/features/public-data-collection/forms/regi
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+export default function PublicFormsPage() {
   return <PublicFormCatalog categories={listFormCategories()} />;
 }

@@ -1,0 +1,96 @@
+import { EPF_CATEGORY } from "../categories";
+import type { DataCollectionForm } from "../types";
+
+export const epfKFormDefinition: DataCollectionForm = {
+  id: "k-form",
+  nameSi: "කේ පෝරමය",
+  nameEn: "K Form",
+  documentPath: "/forms/epf/k-form.pdf",
+  category: EPF_CATEGORY,
+  generationGuidance: [
+    "Keep the employee age, date of birth, date of joining, occupation, and monthly salary plausible together.",
+    "Keep employer name and employer address consistent with a realistic Sri Lankan workplace.",
+    "Use a realistic synthetic EPF number and do not reuse the NIC number as the EPF number.",
+  ],
+  fields: [
+    {
+      key: "employeeFullName",
+      labelSi: "සේවකයාගේ සම්පූර්ණ නම",
+      labelEn: "Employee full name",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "employeeAddress",
+      labelSi: "සේවකයාගේ ලිපිනය",
+      labelEn: "Employee address",
+      type: "address",
+      required: true,
+    },
+    {
+      key: "nicNumber",
+      labelSi: "ජාතික හැඳුනුම්පත් අංකය",
+      labelEn: "National identity card number",
+      type: "nic",
+      required: true,
+    },
+    {
+      key: "dateOfBirth",
+      labelSi: "උපන් දිනය",
+      labelEn: "Date of birth",
+      type: "date",
+      required: true,
+      helpTextSi: "YYYY-MM-DD ආකෘතිය භාවිතා කරන්න.",
+    },
+    {
+      key: "occupation",
+      labelSi: "රැකියාව",
+      labelEn: "Occupation",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "employerName",
+      labelSi: "සේවායෝජකයාගේ නම",
+      labelEn: "Employer name",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "employerAddress",
+      labelSi: "සේවායෝජකයාගේ ලිපිනය",
+      labelEn: "Employer address",
+      type: "address",
+      required: true,
+    },
+    {
+      key: "epfNumber",
+      labelSi: "ඊ.පී.එෆ් අංකය",
+      labelEn: "EPF number",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "dateOfJoining",
+      labelSi: "සේවයට එක් වූ දිනය",
+      labelEn: "Date of joining",
+      type: "date",
+      required: true,
+      helpTextSi: "YYYY-MM-DD ආකෘතිය භාවිතා කරන්න.",
+    },
+    {
+      key: "monthlySalary",
+      labelSi: "මාසික වැටුප",
+      labelEn: "Monthly salary",
+      type: "number",
+      required: true,
+    },
+    {
+      key: "contactNumber",
+      labelSi: "දුරකථන අංකය",
+      labelEn: "Contact number",
+      type: "phone",
+      required: true,
+    },
+  ],
+};
