@@ -17,12 +17,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: |
+          npm install --global corepack@latest
+          corepack enable
+
+      - name: Install pnpm
+        run: |
+          corepack prepare pnpm@10 --activate
+          pnpm --version
+
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
       - name: Verify Vercel Authentication
         run: |
           vercel whoami --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Remove stale Vercel configuration
+        run: rm -rf .vercel
 
       - name: Pull Vercel Environment Information
         run: |
