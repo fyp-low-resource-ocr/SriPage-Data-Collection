@@ -8,6 +8,7 @@ on:
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
 jobs:
   Deploy-Production:
@@ -20,21 +21,31 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      - name: Verify Vercel Access
+      - name: Verify Vercel Authentication
         run: |
+          echo "Authenticated Vercel user:"
           vercel whoami --token=${{ secrets.VERCEL_TOKEN }}
-          vercel project ls \
-            --scope=sri-page \
-            --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: List Accessible Vercel Projects
+        run: |
+          echo "Accessible Vercel projects:"
+          vercel project ls --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Remove stale Vercel configuration
         run: rm -rf .vercel
 
       - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel pull \
+            --yes \
+            --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel build \
+            --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy Project Artifacts to Vercel
         run: |
