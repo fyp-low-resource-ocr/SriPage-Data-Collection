@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clipboard, FileText, Sparkles } from "lucide-react";
+import { Check, Clipboard, FileText, Save, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { FormDetailsResponse } from "../api/form-details-api";
 import type { DataCollectionForm } from "../forms/types";
@@ -9,10 +9,18 @@ export function FormDetailsDisplay({
   form,
   details,
   isGenerating,
+  isSaving,
+  saveStatus,
+  saveError,
+  onSave,
 }: {
   form: DataCollectionForm | null;
   details: FormDetailsResponse | null;
   isGenerating: boolean;
+  isSaving: boolean;
+  saveStatus: "idle" | "saving" | "saved" | "error";
+  saveError: string;
+  onSave: () => void;
 }) {
   if (isGenerating) {
     return <FormDetailsLoading />;
@@ -31,7 +39,18 @@ export function FormDetailsDisplay({
           <h2>{form.nameEn}</h2>
           <p lang="si">{details.formName}</p>
         </div>
+        <button
+          className="button button-primary public-save-button"
+          type="button"
+          onClick={onSave}
+          disabled={isSaving || saveStatus === "saved"}
+        >
+          {isSaving ? <span className="spinner" /> : saveStatus === "saved" ? <Check size={16} /> : <Save size={16} />}
+          {isSaving ? "Saving..." : saveStatus === "saved" ? "Saved" : "Save"}
+        </button>
       </div>
+
+      {saveError && <div className="error public-save-error">{saveError}</div>}
 
       <div className="public-details-list">
         {form.fields.map((field) => (

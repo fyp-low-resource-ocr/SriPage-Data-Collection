@@ -398,6 +398,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-bottom: 1px solid var(--line);
 }
 .public-details-title { min-width: 0; }
+.public-save-button { margin-left: auto; min-width: 104px; }
+.public-save-error { margin-top: 14px; }
 .public-details-head h2,
 .public-details-empty h2,
 .public-details-loading h2 {
@@ -488,6 +490,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .public-form-layout, .public-catalog-layout { width: min(100% - 28px, 1180px); padding: 24px 0 42px; }
   .public-form-panel, .public-details-panel { padding: 18px; }
   .public-details-panel { min-height: 420px; }
+  .public-details-head { align-items: flex-start; flex-wrap: wrap; }
+  .public-save-button { width: 100%; margin-left: 0; }
   .public-detail-row { grid-template-columns: 1fr 34px; }
   .public-detail-row p { grid-column: 1 / -1; order: 3; }
   .public-copy-button { grid-column: 2; grid-row: 1; justify-self: end; }

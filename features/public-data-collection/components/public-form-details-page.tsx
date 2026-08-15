@@ -14,7 +14,15 @@ export function PublicFormDetailsPage({ form }: { form: DataCollectionForm }) {
       <PublicFormsHeader />
       <section className="public-form-layout" aria-label="Public form details generator">
         <DetailsActionPanel form={form} details={details} />
-        <FormDetailsDisplay form={form} details={details.result} isGenerating={details.isGenerating} />
+        <FormDetailsDisplay
+          form={form}
+          details={details.result}
+          isGenerating={details.isGenerating}
+          isSaving={details.isSaving}
+          saveStatus={details.saveStatus}
+          saveError={details.saveError}
+          onSave={details.saveDetails}
+        />
       </section>
     </main>
   );

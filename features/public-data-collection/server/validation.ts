@@ -17,7 +17,16 @@ export const formDetailsRequestSchema = z.object({
   extraInstruction: z.string().trim().max(1000).optional(),
 });
 
+export const saveFormDetailsRequestSchema = z.object({
+  formId: z.string().trim().min(1).max(120),
+  formName: z.string().trim().min(1).max(200),
+  model: z.string().trim().min(1).max(120),
+  details: z.record(z.string().trim().min(1).max(120), z.string().trim().max(2000)),
+  extraInstruction: z.string().trim().max(1000).optional(),
+});
+
 export type FormDetailsRequest = z.infer<typeof formDetailsRequestSchema>;
+export type SaveFormDetailsRequest = z.infer<typeof saveFormDetailsRequestSchema>;
 
 export async function parseFormDetailsRequest(request: Request) {
   if (!request.headers.get("content-type")?.includes("application/json")) {
@@ -25,4 +34,8 @@ export async function parseFormDetailsRequest(request: Request) {
   }
 
   return formDetailsRequestSchema.parse(await request.json());
+}
+
+export async function parseSaveFormDetailsRequest(request: Request) {
+  return saveFormDetailsRequestSchema.parse(await request.json());
 }
