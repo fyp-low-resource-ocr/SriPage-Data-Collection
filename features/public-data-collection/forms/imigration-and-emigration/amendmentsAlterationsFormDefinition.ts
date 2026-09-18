@@ -7,14 +7,26 @@ export const amendmentsAlterationsFormDefinition: DataCollectionForm = {
   nameEn: "Application for Amending a Sri Lankan Travel Document",
   documentPath: "/forms/amendments-alterations/amendments-alterations.pdf",
   category: IMMIGRATION_EMIGRATION_CATEGORY,
+
   generationGuidance: [
-    "Keep surname, other names, amendedName, NIC number, and travel document number consistent with one synthetic applicant.",
-    "At least one amendment request should be ඔව් so the record looks useful for an amendment application.",
+    "Generate values only for the fields defined in this form.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "When applying generated values, replace only the matching placeholder. Do not modify printed OCR text, page number, bounding box, annotation label, reading order, or other layout metadata.",
+    "For the checkbox fields changeOfNameRequested, professionAmendmentRequested, includeNicNumberRequested, validityExtensionRequested, validationForAnotherJourneyRequested, and otherAmendmentRequested: return only ඔව් or නැත.",
+    "When rendering a checkbox placeholder, ඔව් means place a ✓ mark inside the corresponding checkbox and නැත means leave the checkbox blank. Do not print the words ඔව් or නැත inside the checkbox.",
+    "At least one amendment request should be ඔව් so the synthetic record represents a meaningful amendment application.",
+    "Keep travelDocumentNumber, surname, otherNames, permanentAddress, amendedName, NIC number, and all requested amendments consistent with one synthetic applicant.",
     "If changeOfNameRequested is නැත, amendedName must be අදාළ නොවේ.",
     "If professionAmendmentRequested is නැත, professionOrDesignation must be අදාළ නොවේ.",
     "If includeNicNumberRequested is නැත, nicNumber must be අදාළ නොවේ.",
     "If validityExtensionRequested is නැත, validityExtensionYears must be අදාළ නොවේ.",
     "If otherAmendmentRequested is නැත, otherAmendmentDetails must be අදාළ නොවේ.",
+    "If validityExtensionRequested is ඔව්, validityExtensionYears must be a small realistic positive integer that fits the Years box.",
+    "Keep generated values concise enough to fit naturally inside their assigned bounding boxes.",
+    "Use only synthetic personal identifiers and document numbers. Do not use real public figures or knowingly real personal identifiers.",
+    "Return values using exactly the field keys defined in the fields array. Do not invent extra text fields.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. These are already stored in the static annotation template.",
+    "The applicant signature is represented separately in the annotation template as an optional Signature region and should not be returned as an ordinary text value unless the rendering pipeline explicitly supports synthetic signature assets."
   ],
 
   fields: [

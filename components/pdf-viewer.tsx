@@ -12,7 +12,11 @@ export function usePdfDocument(url: string) {
     let loadingTask: ReturnType<typeof import("pdfjs-dist")["getDocument"]> | undefined;
     void import("pdfjs-dist/webpack.mjs").then((pdfjs) => {
       if (!active) return;
-      loadingTask = pdfjs.getDocument({ url });
+      loadingTask = pdfjs.getDocument({
+        url,
+        useWorkerFetch: true,
+        wasmUrl: "/api/pdfjs/wasm/",
+      });
       return loadingTask.promise;
     }).then((loaded) => {
       if (active && loaded) setDocument(loaded);
