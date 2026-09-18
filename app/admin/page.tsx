@@ -1,8 +1,7 @@
-import { DashboardClient } from "@/components/dashboard-client";
-import { listFonts, listProjects } from "@/lib/server/storage";
+import { AdminDashboardClient } from "@/components/admin-dashboard-client";
 
 export const dynamic = "force-dynamic";
 
 export default function AdminPage() {
-  return <DashboardClient initialProjects={listProjects()} fontCount={listFonts().length} />;
+  return <AdminDashboardClient />;
 }

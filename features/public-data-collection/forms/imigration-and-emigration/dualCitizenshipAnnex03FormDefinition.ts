@@ -9,14 +9,23 @@ export const dualCitizenshipAnnex03FormDefinition: DataCollectionForm = {
   category: IMMIGRATION_EMIGRATION_CATEGORY,
 
   generationGuidance: [
-    "This declaration applies to a child whose parents have not obtained citizenship of a foreign country.",
-    "The child name, mother details, and father details must refer to the same family.",
-    "Mother and father names should be plausible Sri Lankan names and should not refer to real public figures.",
-    "Mother and father National Identity Card numbers must be plausible Sri Lankan NIC numbers.",
-    "Mother and father Sri Lankan passport numbers must be plausible and should be different from each other.",
-    "The reason for the child obtaining foreign citizenship while the parents did not should be realistic and internally consistent.",
-    "Examples of plausible reasons include the child being born in a foreign country where citizenship was acquired by birth.",
-    "Do not generate foreign citizenship for either parent because this declaration specifically states that the parents have not obtained citizenship of another country.",
+    "Generate values only for the fields defined in this form.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "When applying generated values to the document, replace only the matching placeholder. Do not modify printed OCR text, bounding boxes, labels, reading order, page number, or other layout metadata.",
+    "This declaration applies to a child whose mother and father have not obtained citizenship of a foreign country.",
+    "The child name, mother details, father details, and reason for the child's foreign citizenship must describe one internally consistent synthetic family.",
+    "Mother and father names should be plausible synthetic Sri Lankan names and should not refer to real public figures.",
+    "Mother and father National Identity Card numbers must be plausible synthetic Sri Lankan NIC numbers and must be different from each other.",
+    "Mother and father Sri Lankan passport numbers must be plausible synthetic passport numbers and must be different from each other.",
+    "Do not generate foreign citizenship for either parent because item 05 of the declaration states that the father and mother have not obtained citizenship of any country other than Sri Lanka.",
+    "The reasonForChildForeignCitizenship value must explain plausibly how the child alone obtained foreign citizenship while the parents did not.",
+    "A suitable example is that the child was born in a foreign country and acquired that country's citizenship by birth, while both parents remained Sri Lankan citizens only.",
+    "Do not contradict the fixed declaration text in item 05.",
+    "Keep generated values concise enough to fit naturally within the bounding box assigned to each placeholder.",
+    "Use only synthetic personal identifiers and passport numbers. Do not knowingly generate real personal identifiers.",
+    "Return values using exactly the field keys defined in the fields array. Do not invent additional text fields.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "The father and mother signature regions are represented separately in the annotation template as Signature regions. Do not return signatures as ordinary text values unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 
   fields: [

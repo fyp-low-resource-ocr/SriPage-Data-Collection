@@ -23,12 +23,12 @@ export function DashboardClient({
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/projects", { method: "POST", body: formData });
+      const response = await fetch("/api/admin/forms", { method: "POST", body: formData });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not create project.");
-      router.push(`/projects/${body.id}`);
+      if (!response.ok) throw new Error(body.error || "Could not load saved form.");
+      router.push(`/admin/${encodeURIComponent(body.formName)}`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create project.");
+      setError(reason instanceof Error ? reason.message : "Could not load saved form.");
       setBusy(false);
     }
   }
@@ -93,19 +93,19 @@ export function DashboardClient({
           <form className="modal" action={createProject}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
               <div>
-                <span className="eyebrow">New project</span>
-                <h2 id="new-project-title">Import a blank form</h2>
+                <span className="eyebrow">Saved form</span>
+                <h2 id="new-project-title">Load generated annotations</h2>
               </div>
               <button type="button" className="tool-button" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button>
             </div>
-            <p>Your PDF stays in the local application data folder.</p>
+            <p>Enter the saved unique form name, then upload the matching PDF.</p>
             <div className="form-grid">
               <div className="field">
-                <label htmlFor="project-name">Project name</label>
-                <input className="input" id="project-name" name="name" placeholder="e.g. Customer registration form" required maxLength={120} />
+                <label htmlFor="project-name">Unique form name</label>
+                <input className="input" id="project-name" name="name" placeholder="e.g. d_form_1" required maxLength={120} />
               </div>
               <div className="field">
-                <label htmlFor="project-pdf">Blank PDF form</label>
+                <label htmlFor="project-pdf">PDF form</label>
                 <div className="file-drop">
                   <FileText size={24} style={{ margin: "0 auto 10px", color: "var(--forest)" }} />
                   <input id="project-pdf" type="file" name="pdf" accept="application/pdf,.pdf" required />
@@ -118,7 +118,7 @@ export function DashboardClient({
               <button type="button" className="button button-secondary" onClick={() => setOpen(false)}>Cancel</button>
               <button className="button button-primary" disabled={busy}>
                 {busy ? <span className="spinner" /> : <Type size={16} />}
-                {busy ? "Creating…" : "Create project"}
+                {busy ? "Loading..." : "Load annotations"}
               </button>
             </div>
           </form>

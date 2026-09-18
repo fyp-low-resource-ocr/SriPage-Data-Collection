@@ -7,12 +7,21 @@ export const epfDFormDefinition: DataCollectionForm = {
   nameEn: "D Form",
   documentPath: "/forms/epf/d-form.pdf",
   category: EPF_CATEGORY,
+
   generationGuidance: [
+    "Generate values only for the fields defined in this form.",
+    "Each generated field value corresponds to a placeholder in the static OCR/layout annotation template. For example, the value generated for establishmentName will replace {{establishmentName}}.",
+    "When applying generated values to the document, replace only the matching {{fieldKey}} placeholder. Do not modify any other OCR text in the document.",
+    "Do not modify the page number, bounding box, annotation label, reading order, or any other annotation metadata when replacing a placeholder.",
+    "Keep generated values concise enough to fit naturally inside the bounding box assigned to the corresponding placeholder.",
+    "Generate realistic values suitable for a Sri Lankan Employees' Provident Fund D Form.",
     "Keep establishment name, nature of business, registered address, revenue district, and divisional secretariat consistent with each other.",
     "For each male, female, and total employee count group, the total must equal male plus female.",
     "If the establishment was not previously registered under the EPF scheme, previousEpfRegistrationNumber must be අදාළ නොවේ.",
     "If there is no provident fund or contributory pension scheme, providentOrPensionSchemeDetails must be අදාළ නොවේ.",
     "Declarant, employer, proprietor or lessee, and manager names should be plausible Sri Lankan names and should not refer to real public figures.",
+    "Return values using exactly the field keys defined in the fields array. Do not invent additional field keys.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
   ],
 
   fields: [
@@ -45,16 +54,9 @@ export const epfDFormDefinition: DataCollectionForm = {
       required: true,
     },
     {
-      key: "revenueDistrict",
-      labelSi: "ආදායම් දිස්ත්‍රික්කය",
-      labelEn: "Revenue district",
-      type: "text",
-      required: true,
-    },
-    {
-      key: "divisionalSecretariat",
-      labelSi: "ප්‍රාදේශීය ලේකම් කොට්ඨාසය",
-      labelEn: "Divisional Secretariat",
+      key: "revenueDistrict/divisionalSecretariat",
+      labelSi: "ආදායම් දිස්ත්‍රික්කය/ ප්‍රාදේශීය ලේකම් කොට්ඨාසය",
+      labelEn: "Revenue district / Divisional Secretariat",
       type: "text",
       required: true,
     },
@@ -192,7 +194,8 @@ export const epfDFormDefinition: DataCollectionForm = {
     // Page 2
     {
       key: "employmentCommencementDate",
-      labelSi: "සේවකයින් සේවයට යොදාගත් හෝ දායක මුදල් ගෙවීමේ වගකීම ආරම්භ වූ දිනය",
+      labelSi:
+        "සේවකයින් සේවයට යොදාගත් හෝ දායක මුදල් ගෙවීමේ වගකීම ආරම්භ වූ දිනය",
       labelEn:
         "Date from which employees were engaged or liability to contribute commenced",
       type: "date",
@@ -201,8 +204,10 @@ export const epfDFormDefinition: DataCollectionForm = {
     },
     {
       key: "previouslyRegisteredUnderEpf",
-      labelSi: "ආයතනය මීට පෙර සේ.අ.අ. යෝජනා ක්‍රමය යටතේ ලියාපදිංචි කර තිබේද",
-      labelEn: "Has the establishment / estate been registered earlier under E.P.F. Scheme",
+      labelSi:
+        "ආයතනය මීට පෙර සේ.අ.අ. යෝජනා ක්‍රමය යටතේ ලියාපදිංචි කර තිබේද",
+      labelEn:
+        "Has the establishment / estate been registered earlier under E.P.F. Scheme",
       type: "text",
       required: true,
       helpTextSi: "ඔව් / නැත ලෙස සඳහන් කරන්න.",
@@ -216,30 +221,37 @@ export const epfDFormDefinition: DataCollectionForm = {
     },
     {
       key: "hasProvidentOrPensionScheme",
-      labelSi: "සේවකයින් සඳහා අර්ථසාධක හෝ දායක විශ්‍රාම වැටුප් යෝජනා ක්‍රමයක් තිබේද",
-      labelEn: "Is there a provident fund or contributory pension scheme",
+      labelSi:
+        "සේවකයින් සඳහා අර්ථසාධක හෝ දායක විශ්‍රාම වැටුප් යෝජනා ක්‍රමයක් තිබේද",
+      labelEn:
+        "Is there a provident fund or contributory pension scheme",
       type: "text",
       required: true,
       helpTextSi: "ඔව් / නැත ලෙස සඳහන් කරන්න.",
     },
     {
       key: "providentOrPensionSchemeDetails",
-      labelSi: "අර්ථසාධක / විශ්‍රාම වැටුප් යෝජනා ක්‍රමයේ විස්තර",
-      labelEn: "Details of provident fund or contributory pension scheme",
+      labelSi:
+        "අර්ථසාධක / විශ්‍රාම වැටුප් යෝජනා ක්‍රමයේ විස්තර",
+      labelEn:
+        "Details of provident fund or contributory pension scheme",
       type: "text",
       required: false,
     },
     {
       key: "fundApprovalApplied",
-      labelSi: "අදාළ අරමුදල හෝ යෝජනා ක්‍රමය සඳහා අනුමැතිය ඉල්ලා තිබේද",
-      labelEn: "Have you applied for approval of the fund or schemes",
+      labelSi:
+        "අදාළ අරමුදල හෝ යෝජනා ක්‍රමය සඳහා අනුමැතිය ඉල්ලා තිබේද",
+      labelEn:
+        "Have you applied for approval of the fund or schemes",
       type: "text",
       required: true,
       helpTextSi: "ඔව් / නැත ලෙස සඳහන් කරන්න.",
     },
     {
       key: "employeeRecordCardsRequired",
-      labelSi: "අවශ්‍ය සේවක වාර්තා කාඩ්පත් / සාමාජිකත්ව පෝරම සංඛ්‍යාව",
+      labelSi:
+        "අවශ්‍ය සේවක වාර්තා කාඩ්පත් / සාමාජිකත්ව පෝරම සංඛ්‍යාව",
       labelEn:
         "Total number of employees' record cards, certificates or membership forms required",
       type: "number",

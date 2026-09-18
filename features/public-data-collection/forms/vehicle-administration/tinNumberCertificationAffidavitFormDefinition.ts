@@ -10,21 +10,30 @@ export const tinNumberCertificationAffidavitFormDefinition: DataCollectionForm =
   category: VEHICLE_ADMINISTRATION_CATEGORY,
 
   generationGuidance: [
-    "Generate a realistic affidavit relating to an imported motor vehicle and the declarant's taxpayer registration.",
-    "The declarant name, NIC number, residential address, ethnicity, and religion must describe the same person.",
-    "Declarant names should be plausible Sri Lankan names and should not refer to real public figures.",
-    "The National Identity Card number must follow a plausible Sri Lankan NIC format.",
-    "Ethnicity should be one of the options represented by the form, such as Sinhala, Tamil, or Burgher.",
-    "Religion should be one of the options represented by the form, such as Buddhist, Christian, Hindu, or Muslim.",
-    "Generate a plausible motor vehicle chassis number.",
-    "The vehicle type or model must be compatible with the generated chassis information.",
-    "The importer may be the declarant personally or an institution represented by the declarant.",
-    "If importerType is Individual, importerNameOrInstitution must be the same as declarantName.",
-    "If importerType is Institution, importerNameOrInstitution must be a plausible Sri Lankan organization name.",
-    "Generate a plausible Sri Lanka Customs clearance reference number.",
-    "The customs clearance date must be earlier than or equal to the affidavit date.",
-    "The TIN number must be plausible and must remain identical wherever taxpayer registration is referenced.",
-    "The affidavit date must be realistic and chronologically consistent with the vehicle import and customs clearance details.",
+    "Generate values only for the fields defined in this form.",
+    "Each generated field value corresponds either to a {{fieldKey}} placeholder or to a printed choice-control region in the static OCR/layout annotation template.",
+    "When applying generated values, replace only matching placeholders or use the value to resolve the relevant printed choice. Do not modify unrelated OCR text, bounding boxes, labels, reading order, page number, or layout metadata.",
+    "Generate a realistic synthetic affidavit relating to an imported motor vehicle and the declarant's taxpayer registration.",
+    "The declarantName, declarantNicNumber, declarantAddress, ethnicity, and religion must describe the same synthetic person.",
+    "Declarant names should be plausible Sri Lankan names and must not refer to real public figures.",
+    "declarantNicNumber must follow a plausible synthetic Sri Lankan NIC format.",
+    "ethnicity must be exactly සිංහල, දෙමළ, or බර්ගර්. It is a rendering control: retain the matching printed ethnicity and delete/strike the other ethnicity options rather than printing the generated value over the form.",
+    "religion must be exactly බෞද්ධ, ක්‍රිස්තියානි, හින්දු, or මුස්ලිම්. It is a rendering control: retain the corresponding printed religion and delete/strike the other religion options rather than printing the generated value over the form.",
+    "Generate a plausible synthetic motor-vehicle chassis number.",
+    "vehicleTypeOrModel must be compatible with the generated chassis information.",
+    "importerType must be exactly Individual or Institution.",
+    "If importerType is Individual, importerNameOrInstitution must be exactly the same person as declarantName and the renderer must retain the printed 'මා' alternative.",
+    "If importerType is Institution, importerNameOrInstitution must be a plausible synthetic Sri Lankan organization name and the renderer must retain the printed 'අප ආයතනය' alternative.",
+    "customsClearanceNumber must be a plausible synthetic Sri Lanka Customs clearance reference number.",
+    "The form pre-prints the customs-clearance year as 2025, therefore customsClearanceDate must be a valid date in 2025. Only its month and day components should be rendered into the corresponding blanks.",
+    "tinNumber must be a plausible synthetic taxpayer identification number and must remain identical wherever taxpayer registration is referenced.",
+    "The form pre-prints the attestation year as 2025, therefore affidavitDate must be a valid date in 2025. Only its month and day components should be rendered into the corresponding blanks.",
+    "customsClearanceDate must be earlier than or equal to affidavitDate.",
+    "Keep generated values concise enough to fit naturally within their assigned bounding boxes.",
+    "Use only synthetic personal, customs, vehicle, and taxpayer identifiers. Do not knowingly generate real personal identifiers.",
+    "Return values using exactly the field keys defined in the fields array. Do not invent additional ordinary text fields.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "The declarant signature is represented separately as a Signature region in the annotation template and should not be returned as an ordinary text value unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 
   fields: [
@@ -92,6 +101,14 @@ export const tinNumberCertificationAffidavitFormDefinition: DataCollectionForm =
     // Importer details
     // ------------------------------------------------------------
     {
+      key: "importerType",
+      labelSi: "ආනයනකරුගේ වර්ගය",
+      labelEn: "Importer Type",
+      type: "text",
+      required: true,
+      helpTextSi: "Individual / Institution ලෙස සඳහන් කරන්න.",
+    },
+    {
       key: "importerNameOrInstitution",
       labelSi: "ආනයනකරුගේ හෝ ආයතනයේ නම",
       labelEn: "Name of Importer / Institution",
@@ -115,7 +132,7 @@ export const tinNumberCertificationAffidavitFormDefinition: DataCollectionForm =
       labelEn: "Customs Clearance Date",
       type: "date",
       required: true,
-      helpTextSi: "YYYY-MM-DD ආකෘතිය භාවිතා කරන්න.",
+      helpTextSi: "2025 වර්ෂයට අදාළ YYYY-MM-DD ආකෘතිය භාවිතා කරන්න.",
     },
 
     // ------------------------------------------------------------
@@ -138,7 +155,7 @@ export const tinNumberCertificationAffidavitFormDefinition: DataCollectionForm =
       labelEn: "Date of Affidavit",
       type: "date",
       required: true,
-      helpTextSi: "YYYY-MM-DD ආකෘතිය භාවිතා කරන්න.",
+      helpTextSi: "2025 වර්ෂයට අදාළ YYYY-MM-DD ආකෘතිය භාවිතා කරන්න.",
     },
   ],
 };

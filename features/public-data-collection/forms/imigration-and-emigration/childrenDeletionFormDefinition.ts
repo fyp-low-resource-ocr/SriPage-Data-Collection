@@ -9,14 +9,26 @@ export const childrenDeletionFormDefinition: DataCollectionForm = {
   category: IMMIGRATION_EMIGRATION_CATEGORY,
 
   generationGuidance: [
+    "Generate values only for the fields defined in this form.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "When applying generated values to the document, replace only the matching placeholder. Do not modify printed OCR text, bounding boxes, labels, reading order, page number, tables, or any other layout metadata.",
     "Generate details for between one and six children to be deleted from the travel document.",
-    "Use the child rows consecutively starting from the first row and leave remaining unused child rows blank.",
-    "Each child must have a plausible Sri Lankan name with initials, date of birth, and sex.",
-    "Dates of birth must be realistic and consistent with the child-related age requirements of the form.",
-    "Children listed in the same application should plausibly belong to the same family.",
-    "The applicant name should be a plausible Sri Lankan name and should not refer to a real public figure.",
-    "If the application is submitted while applying for a new travel document, presentTravelDocumentNumber may be left blank.",
-    "Do not generate values for the section marked 'For office use only'.",
+    "Use the child rows consecutively starting from child 1. After the last generated child, return an empty string for every field belonging to all remaining unused child rows so those placeholders remain visually blank.",
+    "For every generated child, name, date of birth, and sex must all be present and internally consistent.",
+    "Each child must have a plausible synthetic Sri Lankan name with initials, a realistic date of birth, and sex.",
+    "Children listed in the same application should plausibly belong to the same family and their ages should be compatible with the form's child-related age requirement.",
+    "Use YYYY-MM-DD for generated date values.",
+    "For childSex fields, return only පිරිමි or ගැහැණු.",
+    "The applicant name should be a plausible synthetic Sri Lankan name and should not refer to a real public figure.",
+    "If this application is submitted while applying for a new travel document, presentTravelDocumentNumber must be returned as an empty string so the travel-document-number cage stays blank.",
+    "Otherwise generate a realistic synthetic travel document number that fits naturally in the available cells.",
+    "applicantSignatureDate and spouseOrLegalGuardianSignatureDate should normally be the same date or plausibly very close dates.",
+    "Keep generated text concise enough to fit naturally inside the bounding box assigned to the corresponding placeholder.",
+    "Do not generate values for any area marked 'For office use only'.",
+    "Do not return values for printed instructions, headings, tables, labels, page footer text, or other fixed OCR content.",
+    "Return values using exactly the field keys defined in the fields array. Do not invent extra text fields.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. These are already stored in the static annotation template.",
+    "The applicant signature and spouse/legal-guardian signature are represented separately as Signature regions in the annotation template. Do not return them as ordinary text unless the rendering pipeline explicitly supports synthetic signature image assets."
   ],
 
   fields: [
