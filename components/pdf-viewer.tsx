@@ -3,11 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
-export function usePdfDocument(url: string) {
-  const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
-  const [error, setError] = useState("");
+export function usePdfDocument(url: string | null) {
+  const [state, setState] = useState<{
+    url: string | null;
+    document: PDFDocumentProxy | null;
+    error: string;
+  }>({ url: null, document: null, error: "" });
 
   useEffect(() => {
+    if (!url) return;
+
     let active = true;
     let loadingTask: ReturnType<typeof import("pdfjs-dist")["getDocument"]> | undefined;
     void import("pdfjs-dist/webpack.mjs").then((pdfjs) => {
@@ -19,9 +24,9 @@ export function usePdfDocument(url: string) {
       });
       return loadingTask.promise;
     }).then((loaded) => {
-      if (active && loaded) setDocument(loaded);
+      if (active && loaded) setState({ url, document: loaded, error: "" });
     }).catch(() => {
-      if (active) setError("This PDF could not be rendered.");
+      if (active) setState({ url, document: null, error: "This PDF could not be rendered." });
     });
     return () => {
       active = false;
@@ -29,7 +34,10 @@ export function usePdfDocument(url: string) {
     };
   }, [url]);
 
-  return { document, error };
+  return {
+    document: state.url === url ? state.document : null,
+    error: state.url === url ? state.error : "",
+  };
 }
 
 export function PdfPageCanvas({

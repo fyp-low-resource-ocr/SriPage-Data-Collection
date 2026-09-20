@@ -9,6 +9,7 @@ export type FormDetailsResponse = {
   model: string;
   details: Record<string, string>;
   savedRecordId?: string;
+  uniqueFormName?: string;
 };
 
 export type SaveFormDetailsPayload = FormDetailsResponse & {
@@ -17,6 +18,7 @@ export type SaveFormDetailsPayload = FormDetailsResponse & {
 
 export type SavedFormDetails = {
   savedRecordId: string;
+  uniqueFormName: string;
 };
 
 export async function generateFormDetails(request: FormDetailsRequest) {

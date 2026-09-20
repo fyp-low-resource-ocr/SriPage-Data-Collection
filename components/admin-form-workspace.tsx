@@ -2,15 +2,10 @@
 
 import { ArrowLeft, Check, FileText, MousePointer2, Plus, Save, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SavedGeneratedFormDetails } from "@/features/public-data-collection/server/firebase/generated-form-details-repository";
 import type { SriPageLabel } from "@/features/public-data-collection/forms/epf/epf-d-form-annotations";
 import { PdfPageCanvas, PdfThumbnails, usePdfDocument } from "./pdf-viewer";
-
-type AdminFormPdf = {
-  sourceOriginalName: string;
-  sourceSha256: string;
-};
 
 type AdminAnnotation = NonNullable<SavedGeneratedFormDetails["annotationsJson"]>["annotations"][number];
 type Point = { x: number; y: number };
@@ -33,17 +28,17 @@ const LABELS: SriPageLabel[] = [
 
 export function AdminFormWorkspace({
   savedForm,
-  pdf,
 }: {
   savedForm: SavedGeneratedFormDetails;
-  pdf: AdminFormPdf;
 }) {
   const storedAnnotations = savedForm.annotationsJson?.annotations;
   const [annotations, setAnnotations] = useState<AdminAnnotation[]>(() => storedAnnotations ?? []);
   const [status, setStatus] = useState(savedForm.status);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
-  const { document, error } = usePdfDocument(`/api/admin/forms/${encodeURIComponent(savedForm.uniqueFormName)}/pdf`);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfName, setPdfName] = useState("");
+  const { document, error } = usePdfDocument(pdfUrl);
   const [pageIndex, setPageIndex] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
@@ -64,6 +59,27 @@ export function AdminFormWorkspace({
     [annotations, pageIndex],
   );
   const selected = annotations.find((annotation) => annotation.id === selectedId) ?? null;
+
+  useEffect(() => () => {
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+  }, [pdfUrl]);
+
+  function loadPdfFile(file: File | null) {
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setSaveError("Choose a PDF document.");
+      return;
+    }
+
+    setPdfUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+    setPdfName(file.name);
+    setPageIndex(0);
+    setPageSize({ width: 0, height: 0 });
+    setSaveError("");
+  }
 
   function updateAnnotation(id: string, patch: Partial<AdminAnnotation>) {
     setAnnotations((current) => current.map((annotation) => annotation.id === id ? { ...annotation, ...patch } : annotation));
@@ -196,7 +212,7 @@ export function AdminFormWorkspace({
         </Link>
         <div className="workspace-title">
           <strong>{savedForm.uniqueFormName}</strong>
-          <span>{pdf.sourceOriginalName} · {annotations.length} stored annotation{annotations.length === 1 ? "" : "s"} · {status}</span>
+          <span>{pdfName || "Upload PDF for review"} · {annotations.length} stored annotation{annotations.length === 1 ? "" : "s"} · {status}</span>
         </div>
       </header>
 
@@ -204,7 +220,7 @@ export function AdminFormWorkspace({
         <aside className="side-panel">
           <div className="panel-head">
             <h2>Document pages</h2>
-            <p>{document ? `${document.numPages} page${document.numPages === 1 ? "" : "s"}` : "Loading PDF..."}</p>
+            <p>{document ? `${document.numPages} page${document.numPages === 1 ? "" : "s"}` : "Upload a PDF to preview pages."}</p>
           </div>
           {document && (
             <PdfThumbnails
@@ -240,7 +256,16 @@ export function AdminFormWorkspace({
             </div>
           </div>
           <div className="canvas-scroll">
-            {error ? <div className="error">{error}</div> : document ? (
+            {!pdfUrl ? (
+              <div className="admin-pdf-upload-empty">
+                <FileText size={32} />
+                <div>
+                  <h2>Upload PDF for this review</h2>
+                  <p>The annotations are loaded from Firestore. The PDF stays in this browser session and is not stored on the server.</p>
+                </div>
+                <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
+              </div>
+            ) : error ? <div className="error">{error}</div> : document ? (
               <div className="page-stage">
                 <PdfPageCanvas document={document} pageIndex={pageIndex} scale={1.35 * zoom} onSize={setSize} />
                 {pageSize.width > 0 && (

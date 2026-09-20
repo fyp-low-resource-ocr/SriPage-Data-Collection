@@ -230,6 +230,37 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 12px;
   line-height: 1.45;
 }
+.admin-pdf-upload-empty {
+  min-height: 520px;
+  width: min(680px, 100%);
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 32px;
+  color: var(--forest);
+  background: rgba(255,255,255,.82);
+  border: 1px dashed #aebbb3;
+  border-radius: 12px;
+  text-align: center;
+}
+.admin-pdf-upload-empty h2 {
+  margin: 0 0 6px;
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: 0;
+}
+.admin-pdf-upload-empty p {
+  max-width: 460px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.admin-pdf-upload-empty input {
+  width: min(360px, 100%);
+  color: var(--ink);
+}
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(15,27,22,.52); backdrop-filter: blur(3px); }
 .modal { width: min(520px, 100%); background: white; border-radius: 18px; padding: 26px; box-shadow: 0 30px 80px rgba(0,0,0,.2); }
@@ -610,6 +641,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .public-details-title { min-width: 0; }
 .public-save-button { margin-left: auto; min-width: 104px; }
 .public-save-error { margin-top: 14px; }
+.public-saved-form-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  color: var(--forest);
+  background: #eff7f2;
+  border: 1px solid #cfe4d8;
+  border-radius: 8px;
+}
+.public-saved-form-name strong {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.public-saved-form-name span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
 .public-details-head h2,
 .public-details-empty h2,
 .public-details-loading h2 {
