@@ -13,16 +13,15 @@ export function AdminDashboardClient() {
   async function loadForm(formData: FormData) {
     setBusy(true);
     setError("");
-    try {
-      const response = await fetch("/api/admin/forms", { method: "POST", body: formData });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not load saved form.");
+    const uniqueFormName = String(formData.get("name") || "").trim();
 
-      router.push(`/admin/${encodeURIComponent(body.formName)}`);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not load saved form.");
+    if (!uniqueFormName || uniqueFormName.length > 120) {
+      setError("Enter a saved form name under 120 characters.");
       setBusy(false);
+      return;
     }
+
+    router.push(`/admin/${encodeURIComponent(uniqueFormName)}`);
   }
 
   return (
@@ -39,7 +38,7 @@ export function AdminDashboardClient() {
           <div>
             <span className="eyebrow">Admin review</span>
             <h1>Load generated form annotations.</h1>
-            <p>Use the saved unique form name from Firestore, upload the matching PDF, then review and approve the bounding boxes and text.</p>
+            <p>Use the saved unique form name from Firestore, then upload the matching PDF in the review workspace.</p>
           </div>
         </section>
 
@@ -48,7 +47,7 @@ export function AdminDashboardClient() {
             <div className="admin-panel-head">
               <span className="admin-panel-icon"><UploadCloud size={22} /></span>
               <div>
-                <h2>Upload document</h2>
+                <h2>Open saved form</h2>
                 <p>Find the saved annotation JSON by unique form name.</p>
               </div>
             </div>
@@ -59,15 +58,6 @@ export function AdminDashboardClient() {
                 <div className="admin-input-wrap">
                   <Search size={16} />
                   <input className="input" id="admin-form-name" name="name" placeholder="d_form_2" required maxLength={120} />
-                </div>
-              </div>
-
-              <div className="field">
-                <label htmlFor="admin-form-pdf">PDF document</label>
-                <div className="admin-file-drop">
-                  <FileText size={28} />
-                  <input id="admin-form-pdf" type="file" name="pdf" accept="application/pdf,.pdf" required />
-                  <small>Upload the same source document used by the saved annotations.</small>
                 </div>
               </div>
 
@@ -91,8 +81,8 @@ export function AdminDashboardClient() {
             <div className="admin-review-step">
               <span><FileText size={18} /></span>
               <div>
-                <strong>2. Render PDF with boxes</strong>
-                <p>The uploaded document opens with saved annotations overlaid.</p>
+                <strong>2. Upload PDF in browser</strong>
+                <p>The PDF stays in your browser session and is not stored on the server.</p>
               </div>
             </div>
             <div className="admin-review-step">
