@@ -64,7 +64,13 @@ export function useFormDetails(form: DataCollectionForm) {
         ...current,
         saveStatus: "saved",
         saveError: "",
-        result: current.result ? { ...current.result, savedRecordId: saved.savedRecordId } : current.result,
+        result: current.result
+          ? {
+              ...current.result,
+              savedRecordId: saved.savedRecordId,
+              uniqueFormName: saved.uniqueFormName,
+            }
+          : current.result,
       }));
     } catch (error) {
       setState((current) => ({

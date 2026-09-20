@@ -610,6 +610,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .public-details-title { min-width: 0; }
 .public-save-button { margin-left: auto; min-width: 104px; }
 .public-save-error { margin-top: 14px; }
+.public-saved-form-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  color: var(--forest);
+  background: #eff7f2;
+  border: 1px solid #cfe4d8;
+  border-radius: 8px;
+}
+.public-saved-form-name strong {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.public-saved-form-name span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
 .public-details-head h2,
 .public-details-empty h2,
 .public-details-loading h2 {

@@ -51,6 +51,7 @@ export function FormDetailsDisplay({
       </div>
 
       {saveError && <div className="error public-save-error">{saveError}</div>}
+      {details.uniqueFormName && <SavedUniqueFormName uniqueFormName={details.uniqueFormName} />}
 
       <div className="public-details-list">
         {form.fields.map((field) => (
@@ -63,6 +64,28 @@ export function FormDetailsDisplay({
         ))}
       </div>
     </section>
+  );
+}
+
+function SavedUniqueFormName({ uniqueFormName }: { uniqueFormName: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyName() {
+    await navigator.clipboard.writeText(uniqueFormName);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
+  return (
+    <div className="public-saved-form-name">
+      <div>
+        <strong>Saved unique form</strong>
+        <span>{uniqueFormName}</span>
+      </div>
+      <button className="tool-button public-copy-button" type="button" onClick={copyName} aria-label="Copy saved unique form name">
+        {copied ? <Check size={16} /> : <Clipboard size={16} />}
+      </button>
+    </div>
   );
 }
 

@@ -132,7 +132,7 @@ export async function saveGeneratedFormDetails({
   const collection = db.collection("formDetails");
   const uniqueFormNameBase = normalizeFormName(form.nameEn || form.id);
 
-  const documentId = await db.runTransaction(async (transaction) => {
+  const savedRecord = await db.runTransaction(async (transaction) => {
     const counterRef = db.collection("formDetailsCounters").doc(uniqueFormNameBase);
     const existingFormsQuery = collection.where("uniqueFormNameBase", "==", uniqueFormNameBase);
     const [counterSnapshot, existingFormsSnapshot] = await Promise.all([
@@ -163,10 +163,13 @@ export async function saveGeneratedFormDetails({
       { merge: true },
     );
 
-    return document.id;
+    return {
+      savedRecordId: document.id,
+      uniqueFormName,
+    };
   });
 
-  return documentId;
+  return savedRecord;
 }
 
 export async function getSavedGeneratedFormDetails(uniqueFormName: string): Promise<SavedGeneratedFormDetails | null> {

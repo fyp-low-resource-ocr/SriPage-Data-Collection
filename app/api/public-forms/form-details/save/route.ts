@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   try {
     const body = await parseSaveFormDetailsRequest(request);
     const form = resolveFormForDetailsRequest({ formId: body.formId });
-    const savedRecordId = await saveGeneratedFormDetails({
+    const savedRecord = await saveGeneratedFormDetails({
       form,
       profile: {
         formId: body.formId,
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       extraInstruction: body.extraInstruction,
     });
 
-    return Response.json({ savedRecordId }, { status: 201 });
+    return Response.json(savedRecord, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return Response.json({ error: "Invalid save request.", issues: error.issues }, { status: 400 });
