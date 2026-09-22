@@ -212,7 +212,7 @@ export function AdminFormWorkspace({
         </Link>
         <div className="workspace-title">
           <strong>{savedForm.uniqueFormName}</strong>
-          <span>{pdfName || "Upload PDF for review"} · {annotations.length} stored annotation{annotations.length === 1 ? "" : "s"} · {status}</span>
+          <span>{pdfName || "Upload filled PDF for review"} · {annotations.length} stored annotation{annotations.length === 1 ? "" : "s"} · {status}</span>
         </div>
       </header>
 
@@ -260,8 +260,8 @@ export function AdminFormWorkspace({
               <div className="admin-pdf-upload-empty">
                 <FileText size={32} />
                 <div>
-                  <h2>Upload PDF for this review</h2>
-                  <p>The annotations are loaded from Firestore. The PDF stays in this browser session and is not stored on the server.</p>
+                  <h2>Upload the filled PDF for this review</h2>
+                  <p>The annotations are loaded from Firestore. The uploaded filled PDF stays in this browser session and is not stored on the server.</p>
                 </div>
                 <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
               </div>

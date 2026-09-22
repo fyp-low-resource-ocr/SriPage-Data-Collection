@@ -38,7 +38,7 @@ export function AdminDashboardClient() {
           <div>
             <span className="eyebrow">Admin review</span>
             <h1>Load generated form annotations.</h1>
-            <p>Use the saved unique form name from Firestore, then upload the matching PDF in the review workspace.</p>
+            <p>Use the saved unique form name from Firestore, then upload the filled PDF in the review workspace.</p>
           </div>
         </section>
 
