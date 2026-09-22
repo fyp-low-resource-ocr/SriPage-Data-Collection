@@ -82,7 +82,7 @@ export function AdminDashboardClient() {
               <span><FileText size={18} /></span>
               <div>
                 <strong>2. Upload PDF in browser</strong>
-                <p>Upload the filled PDF for review. The file stays in your browser session and is not stored on the server.</p>
+                <p>The PDF stays in your browser session and is not stored on the server.</p>
               </div>
             </div>
             <div className="admin-review-step">
