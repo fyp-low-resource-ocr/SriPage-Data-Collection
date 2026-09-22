@@ -20,7 +20,7 @@ export function usePdfDocument(url: string | null) {
       loadingTask = pdfjs.getDocument({
         url,
         useWorkerFetch: true,
-        wasmUrl: "/api/pdfjs/wasm/",
+        wasmUrl: "/pdfjs/wasm/",
       });
       return loadingTask.promise;
     }).then((loaded) => {

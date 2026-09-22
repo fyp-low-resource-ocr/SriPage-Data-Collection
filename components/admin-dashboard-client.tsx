@@ -38,7 +38,7 @@ export function AdminDashboardClient() {
           <div>
             <span className="eyebrow">Admin review</span>
             <h1>Load generated form annotations.</h1>
-            <p>Use the saved unique form name from Firestore, then upload the matching PDF in the review workspace.</p>
+            <p>Use the saved unique form name from Firestore, then upload the filled PDF in the review workspace.</p>
           </div>
         </section>
 
@@ -82,7 +82,7 @@ export function AdminDashboardClient() {
               <span><FileText size={18} /></span>
               <div>
                 <strong>2. Upload PDF in browser</strong>
-                <p>The PDF stays in your browser session and is not stored on the server.</p>
+                <p>Upload the filled PDF for review. The file stays in your browser session and is not stored on the server.</p>
               </div>
             </div>
             <div className="admin-review-step">
