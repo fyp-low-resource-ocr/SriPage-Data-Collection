@@ -11,7 +11,7 @@ export const motorVehicleWeightCertificateApplicationFormDefinition: DataCollect
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the Firebase OCR/layout annotation template.",
     "When applying generated values, replace only matching placeholders. Do not modify fixed OCR text, bounding boxes, labels, reading order, page number, form code, fee instruction, or other layout metadata.",
     "Generate a realistic synthetic Sri Lankan motor vehicle weight-certificate application.",
     "applicantName and applicantAddress must represent the same plausible synthetic Sri Lankan person or organization.",
@@ -32,7 +32,7 @@ export const motorVehicleWeightCertificateApplicationFormDefinition: DataCollect
     "Do not generate a certificate-of-weight number or examiner details/signature. Those fields are completed after the vehicle is weighed and are stored only as non-generated annotation regions.",
     "Do not generate receipt details. The form only instructs the applicant to pay Rs. 200/- and paste the cash receipt overleaf.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional ordinary text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
     "The applicant signature is represented separately as a Signature region in the annotation template and should not be returned as an ordinary text value unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 

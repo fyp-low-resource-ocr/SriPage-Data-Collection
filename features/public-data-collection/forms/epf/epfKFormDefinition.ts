@@ -10,7 +10,7 @@ export const epfKFormDefinition: DataCollectionForm = {
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated value corresponds to a {fieldKey} placeholder in the static EPF K Form OCR/layout annotation template.",
+    "Each generated value corresponds to a {fieldKey} placeholder in the Firebase EPF K Form OCR/layout annotation template.",
     "Replace only the matching placeholder value. Do not modify printed OCR text, page number, bounding box, annotation label, reading order, or other layout metadata.",
     "Generate realistic synthetic values appropriate for a Sri Lankan Employees' Provident Fund claim form.",
     "Keep the member's names, NIC information, age/date of birth, employment dates, employer details, membership numbers, and bank details internally consistent.",
@@ -21,7 +21,7 @@ export const epfKFormDefinition: DataCollectionForm = {
     "Use synthetic NIC, EPF/membership, bank, employer, and contact-like identifiers. Do not use real public figures or knowingly real personal identifiers.",
     "For yes/no fields such as nicCopyAnnexed, return a concise value such as ඔව් or නැත.",
     "Keep generated text concise enough to fit naturally within the bounding box assigned to its placeholder.",
-    "Do not return OCR text, bounding boxes, labels, page numbers, or reading order. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, page numbers, or reading order. Those are already stored in the Firebase annotation template.",
     "Signature, thumb-mark, and similar image regions are stored separately in the annotation template and should not be returned as ordinary text values unless your rendering pipeline explicitly supports synthetic image assets.",
   ],
 

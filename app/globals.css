@@ -130,6 +130,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .admin-upload-panel {
   padding: 24px;
 }
+.admin-saved-template-panel {
+  grid-column: 1 / -1;
+}
 .admin-panel-head {
   display: flex;
   align-items: center;
@@ -308,7 +311,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tool-button { height: 32px; min-width: 32px; padding: 0 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; font-size: 11px; }
 .tool-button:hover { background: #eef1ed; }
 .tool-button.active { color: var(--forest); border-color: #bcd3c7; background: var(--mint); }
+.admin-pdf-toolbar-upload { position: relative; overflow: hidden; }
+.admin-pdf-toolbar-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .zoom-readout { min-width: 46px; text-align: center; font-size: 11px; color: var(--muted); }
+.admin-side-upload-button {
+  min-height: 38px;
+  margin: 0 18px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  color: var(--forest);
+  background: var(--mint);
+  border: 1px solid #bcd3c7;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.admin-side-upload-button:hover { background: #dff2e8; }
+.admin-side-upload-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .canvas-scroll { flex: 1; overflow: auto; padding: 32px; }
 .page-stage { position: relative; margin: 0 auto; width: max-content; box-shadow: 0 10px 32px rgba(20,35,28,.17); background: white; line-height: 0; user-select: none; }
 .page-stage canvas { display: block; }

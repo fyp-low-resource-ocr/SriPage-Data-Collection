@@ -13,7 +13,7 @@ export const motorVehicleRegistrationParticularsChangeFormDefinition: DataCollec
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the Firebase OCR/layout annotation template.",
     "When applying generated values, replace only matching placeholders. Do not modify fixed OCR text, bounding boxes, labels, reading order, page number, form code, or other layout metadata.",
     "Generate a realistic synthetic request to amend one or more particulars in a Sri Lankan motor vehicle Certificate of Registration.",
     "vehicleNumber must follow a plausible synthetic Sri Lankan motor vehicle registration format.",
@@ -31,7 +31,7 @@ export const motorVehicleRegistrationParticularsChangeFormDefinition: DataCollec
     "Use only synthetic vehicle, address, authority, and registration information. Do not knowingly generate real personal identifiers.",
     "Do not generate a receipt number or receipt details. The form only states that the required fee was paid and the receipt was pasted overleaf.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional ordinary text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
     "The applicant signature is represented separately as a Signature region in the annotation template and should not be returned as an ordinary text value unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 

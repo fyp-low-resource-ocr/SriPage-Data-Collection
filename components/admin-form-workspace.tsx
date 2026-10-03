@@ -1,15 +1,23 @@
 "use client";
 
-import { ArrowLeft, Check, FileText, MousePointer2, Plus, Save, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, Check, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AnnotationDocument, SriPageAnnotation, SriPageLabel } from "@/features/public-data-collection/forms/annotation-types";
 import type { SavedGeneratedFormDetails } from "@/features/public-data-collection/server/firebase/generated-form-details-repository";
-import type { SriPageLabel } from "@/features/public-data-collection/forms/epf/epf-d-form-annotations";
 import { PdfPageCanvas, PdfThumbnails, usePdfDocument } from "./pdf-viewer";
 
-type AdminAnnotation = NonNullable<SavedGeneratedFormDetails["annotationsJson"]>["annotations"][number];
+type AdminAnnotation = SriPageAnnotation;
 type Point = { x: number; y: number };
 type Tool = "select" | "draw";
+type TemplateDraft = {
+  formId: string;
+  formName: string;
+  pdfFile?: File;
+  pdfUrl?: string;
+  pdfName: string;
+  annotationsJson: AnnotationDocument;
+};
 
 const LABELS: SriPageLabel[] = [
   "Printed text",
@@ -28,16 +36,20 @@ const LABELS: SriPageLabel[] = [
 
 export function AdminFormWorkspace({
   savedForm,
+  templateDraft,
 }: {
-  savedForm: SavedGeneratedFormDetails;
+  savedForm?: SavedGeneratedFormDetails;
+  templateDraft?: TemplateDraft;
 }) {
-  const storedAnnotations = savedForm.annotationsJson?.annotations;
+  const isTemplateMode = Boolean(templateDraft);
+  const initialAnnotationsJson = templateDraft?.annotationsJson ?? savedForm?.annotationsJson ?? null;
+  const storedAnnotations = initialAnnotationsJson?.annotations;
   const [annotations, setAnnotations] = useState<AdminAnnotation[]>(() => storedAnnotations ?? []);
-  const [status, setStatus] = useState(savedForm.status);
+  const [status, setStatus] = useState(savedForm?.status ?? "template");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfName, setPdfName] = useState("");
+  const [pdfUrl, setPdfUrl] = useState<string | null>(templateDraft?.pdfUrl ?? null);
+  const [pdfName, setPdfName] = useState(templateDraft?.pdfUrl ? templateDraft.pdfName : "");
   const { document, error } = usePdfDocument(pdfUrl);
   const [pageIndex, setPageIndex] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -63,6 +75,12 @@ export function AdminFormWorkspace({
   useEffect(() => () => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
   }, [pdfUrl]);
+
+  useEffect(() => {
+    if (templateDraft?.pdfFile) {
+      loadPdfFile(templateDraft.pdfFile);
+    }
+  }, [templateDraft?.pdfFile]);
 
   function loadPdfFile(file: File | null) {
     if (!file) return;
@@ -186,13 +204,13 @@ export function AdminFormWorkspace({
     setSaveState("saving");
     setSaveError("");
     try {
-      const response = await fetch(`/api/admin/forms/${encodeURIComponent(savedForm.uniqueFormName)}`, {
+      const response = await fetch(`/api/admin/forms/${encodeURIComponent(savedForm?.uniqueFormName ?? "")}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ annotations }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not approve annotations.");
+      if (!response.ok) throw new Error(getApiErrorMessage(body, "Could not approve annotations."));
       setAnnotations(body.annotationsJson.annotations);
       setStatus(body.status);
       setSaveState("saved");
@@ -202,7 +220,52 @@ export function AdminFormWorkspace({
     }
   }
 
+  async function saveTemplate() {
+    if (!templateDraft) return;
+    setSaveState("saving");
+    setSaveError("");
+    try {
+      const annotationsJson = {
+        metadata: {
+          ...templateDraft.annotationsJson.metadata,
+          id: templateDraft.formId,
+          name: templateDraft.formName,
+          source: templateDraft.annotationsJson.metadata.source || pdfName,
+        },
+        annotations: annotations.map(cleanAnnotationForSave),
+      };
+      const response = await fetch(`/api/admin/templates/${encodeURIComponent(templateDraft.formId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formName: templateDraft.formName,
+          annotationsJson,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(getApiErrorMessage(body, "Could not save template."));
+      setAnnotations(body.annotationsJson.annotations);
+      setStatus(body.status);
+      setSaveState("saved");
+    } catch (reason) {
+      setSaveState("error");
+      setSaveError(reason instanceof Error ? reason.message : "Could not save template.");
+    }
+  }
+
   const drawBox = drawStart && drawCurrent ? normalizeSriPageBBox(bboxFromPoints(drawStart, drawCurrent)) : null;
+  const workspaceTitle = templateDraft?.formName ?? savedForm?.uniqueFormName ?? "Annotation editor";
+  const uploadPrompt = isTemplateMode ? "Upload empty PDF for template review" : "Upload filled PDF for review";
+  const emptyStateTitle = isTemplateMode ? "Upload the empty PDF for this template" : "Upload the filled PDF for this review";
+  const emptyStateCopy = isTemplateMode
+    ? "The uploaded annotation JSON is editable here. Saving writes the corrected template to Firestore."
+    : "The annotations are loaded from Firestore. The uploaded filled PDF stays in this browser session and is not stored on the server.";
+  const saveButtonLabel = isTemplateMode
+    ? saveState === "saving" ? "Saving template..." : saveState === "saved" ? "Template saved" : "Save template"
+    : saveState === "saving" ? "Saving changes..." : saveState === "saved" ? "Saved and approved" : "Save changes and approve";
+  const saveSuccessMessage = isTemplateMode
+    ? "Template annotations saved to formAnnotationTemplates."
+    : "Annotation JSON saved and status changed to approved.";
 
   return (
     <div className="workspace">
@@ -211,8 +274,8 @@ export function AdminFormWorkspace({
           <ArrowLeft size={17} />
         </Link>
         <div className="workspace-title">
-          <strong>{savedForm.uniqueFormName}</strong>
-          <span>{pdfName || "Upload filled PDF for review"} · {annotations.length} stored annotation{annotations.length === 1 ? "" : "s"} · {status}</span>
+          <strong>{workspaceTitle}</strong>
+          <span>{pdfName || uploadPrompt} · {annotations.length} annotation{annotations.length === 1 ? "" : "s"} · {status}</span>
         </div>
       </header>
 
@@ -222,6 +285,13 @@ export function AdminFormWorkspace({
             <h2>Document pages</h2>
             <p>{document ? `${document.numPages} page${document.numPages === 1 ? "" : "s"}` : "Upload a PDF to preview pages."}</p>
           </div>
+          {isTemplateMode && (
+            <label className="admin-side-upload-button">
+              <UploadCloud size={15} />
+              Upload empty PDF
+              <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
+            </label>
+          )}
           {document && (
             <PdfThumbnails
               document={document}
@@ -238,6 +308,12 @@ export function AdminFormWorkspace({
           <div className="canvas-toolbar">
             <div className="tool-group">
               <span className="admin-form-badge"><FileText size={14} /> Saved annotations</span>
+              {isTemplateMode && (
+                <label className="tool-button admin-pdf-toolbar-upload" title="Upload empty PDF">
+                  <UploadCloud size={15} />
+                  <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
+                </label>
+              )}
               <button className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move" onClick={() => setTool("select")}>
                 <MousePointer2 size={15} />
               </button>
@@ -260,12 +336,21 @@ export function AdminFormWorkspace({
               <div className="admin-pdf-upload-empty">
                 <FileText size={32} />
                 <div>
-                  <h2>Upload the filled PDF for this review</h2>
-                  <p>The annotations are loaded from Firestore. The uploaded filled PDF stays in this browser session and is not stored on the server.</p>
+                  <h2>{emptyStateTitle}</h2>
+                  <p>{emptyStateCopy}</p>
                 </div>
                 <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
               </div>
-            ) : error ? <div className="error">{error}</div> : document ? (
+            ) : error ? (
+              <div className="admin-pdf-upload-empty">
+                <FileText size={32} />
+                <div>
+                  <h2>{error}</h2>
+                  <p>Upload the empty PDF for this template to continue editing the saved annotations.</p>
+                </div>
+                <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
+              </div>
+            ) : document ? (
               <div className="page-stage">
                 <PdfPageCanvas document={document} pageIndex={pageIndex} scale={1.35 * zoom} onSize={setSize} />
                 {pageSize.width > 0 && (
@@ -322,18 +407,18 @@ export function AdminFormWorkspace({
 
         <aside className="side-panel right">
           <div className="panel-head">
-            <h2>Stored text</h2>
-            <p>Text and bounding boxes loaded from the saved formDetails document.</p>
+            <h2>{isTemplateMode ? "Template text" : "Stored text"}</h2>
+            <p>{isTemplateMode ? "Text and bounding boxes loaded from the uploaded annotation JSON." : "Text and bounding boxes loaded from the saved formDetails document."}</p>
           </div>
 
           <div className="panel-section">
             <h3>Review actions</h3>
             <div className="form-grid">
-              <button className="button button-primary admin-approve-button" type="button" onClick={approveAnnotations} disabled={saveState === "saving"}>
+              <button className="button button-primary admin-approve-button" type="button" onClick={isTemplateMode ? saveTemplate : approveAnnotations} disabled={saveState === "saving"}>
                 {saveState === "saving" ? <span className="spinner" /> : saveState === "saved" ? <Check size={16} /> : <Save size={16} />}
-                {saveState === "saving" ? "Saving changes..." : saveState === "saved" ? "Saved and approved" : "Save changes and approve"}
+                {saveButtonLabel}
               </button>
-              {saveState === "saved" && <div className="admin-save-note">Annotation JSON saved and status changed to approved.</div>}
+              {saveState === "saved" && <div className="admin-save-note">{saveSuccessMessage}</div>}
             </div>
           </div>
 
@@ -376,6 +461,20 @@ export function AdminFormWorkspace({
                 <dl className="admin-annotation-meta">
                   <div><dt>Page</dt><dd>{selected.page}</dd></div>
                 </dl>
+                {isTemplateMode && (
+                  <div className="field">
+                    <label htmlFor="admin-annotation-field-key">Field key</label>
+                    <input
+                      id="admin-annotation-field-key"
+                      className="input"
+                      value={selected.fieldKey ?? ""}
+                      onChange={(event) => updateAnnotation(selected.id, {
+                        fieldKey: event.target.value.trim() || undefined,
+                        placeholder: Boolean(event.target.value.trim()) || undefined,
+                      })}
+                    />
+                  </div>
+                )}
                 <button className="button button-danger admin-approve-button" type="button" onClick={deleteSelectedAnnotation}>
                   <Trash2 size={16} />
                   Delete annotation
@@ -415,6 +514,25 @@ function moveBBox([x1, y1, x2, y2]: AdminAnnotation["bbox"], dx: number, dy: num
   const nextY1 = clamp(y1 + dy, 0, 1000 - height);
 
   return [nextX1, nextY1, nextX1 + width, nextY1 + height];
+}
+
+function cleanAnnotationForSave(annotation: AdminAnnotation): AdminAnnotation {
+  return {
+    ...annotation,
+    fieldKey: annotation.fieldKey?.trim() || undefined,
+    notes: annotation.notes?.trim() || undefined,
+  };
+}
+
+function getApiErrorMessage(body: unknown, fallback: string) {
+  if (!body || typeof body !== "object") return fallback;
+  const error = "error" in body && typeof body.error === "string" ? body.error : fallback;
+  const issues = "issues" in body && Array.isArray(body.issues) ? body.issues : [];
+  const firstIssue = issues[0];
+  if (!firstIssue || typeof firstIssue !== "object" || !("message" in firstIssue)) return error;
+  const path = "path" in firstIssue && Array.isArray(firstIssue.path) ? firstIssue.path.join(".") : "";
+  const message = typeof firstIssue.message === "string" ? firstIssue.message : "";
+  return [error, path, message].filter(Boolean).join(" ");
 }
 
 function resizeBBox([x1, y1, x2, y2]: AdminAnnotation["bbox"], dx: number, dy: number): AdminAnnotation["bbox"] {

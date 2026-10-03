@@ -10,7 +10,7 @@ export const dualCitizenshipAnnex03FormDefinition: DataCollectionForm = {
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the Firebase OCR/layout annotation template.",
     "When applying generated values to the document, replace only the matching placeholder. Do not modify printed OCR text, bounding boxes, labels, reading order, page number, or other layout metadata.",
     "This declaration applies to a child whose mother and father have not obtained citizenship of a foreign country.",
     "The child name, mother details, father details, and reason for the child's foreign citizenship must describe one internally consistent synthetic family.",
@@ -24,7 +24,7 @@ export const dualCitizenshipAnnex03FormDefinition: DataCollectionForm = {
     "Keep generated values concise enough to fit naturally within the bounding box assigned to each placeholder.",
     "Use only synthetic personal identifiers and passport numbers. Do not knowingly generate real personal identifiers.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
     "The father and mother signature regions are represented separately in the annotation template as Signature regions. Do not return signatures as ordinary text values unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 

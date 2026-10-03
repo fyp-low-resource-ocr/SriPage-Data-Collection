@@ -11,7 +11,7 @@ export const indianOriginCitizenshipCertificateIssuedFormDefinition: DataCollect
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the Firebase OCR/layout annotation template.",
     "When applying generated values, replace only matching placeholders. Do not modify fixed OCR text, bounding boxes, labels, reading order, page number, logo, pre-printed serial number, or other document-control information.",
     "Generate a synthetic citizenship certificate scenario consistent with the Grant of Citizenship to Persons of Indian Origin Act, No. 35 of 2003.",
     "commissionerName must be a plausible synthetic name and must not identify a real public official.",
@@ -28,7 +28,7 @@ export const indianOriginCitizenshipCertificateIssuedFormDefinition: DataCollect
     "Keep generated values concise enough to fit naturally inside their assigned bounding boxes.",
     "Do not generate or alter the pre-printed serial number 000496, form/control code C/P/I/O/2003/4, Annex 14 text, state emblem, or other fixed document-control content.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
     "The Commissioner signature is represented separately as a Signature region in the annotation template and should not be returned as an ordinary text value unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 
