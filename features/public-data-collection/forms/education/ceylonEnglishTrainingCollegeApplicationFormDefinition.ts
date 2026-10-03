@@ -1,0 +1,246 @@
+import { EDUCATION_CATEGORY } from "../categories";
+import type { DataCollectionForm } from "../types";
+
+export const ceylonEnglishTrainingCollegeApplicationFormDefinition: DataCollectionForm = {
+  id: "ceylon-english-training-college-application",
+  nameSi: "ලංකා ඉංග්‍රීසි පුහුණු විද්‍යාල අයදුම්පත",
+  nameEn: "Ceylon English Training College Application Form",
+  documentPath:
+    "/forms/education/ceylon-english-training-college-application.pdf",
+  category: EDUCATION_CATEGORY,
+
+  generationGuidance: [
+    "Generate values only for the fields defined in this form.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "When applying generated values, replace only matching placeholders. Do not modify fixed OCR text, bounding boxes, labels, reading order, page number, logos, table structure, declaration text, or scan watermark.",
+    "Generate one internally consistent synthetic applicant for the Ceylon English Training College application.",
+    "applicantNameWithInitials must be a plausible synthetic Sri Lankan name and must not refer to a real public figure.",
+    "nationalIdentityCardNumber must be a plausible synthetic Sri Lankan NIC number.",
+    "phoneNumber and whatsAppNumber must be plausible synthetic Sri Lankan contact numbers. They may be identical if the applicant uses the same number for WhatsApp.",
+    "address, divisionalSecretarialOffice, and district must be geographically consistent with one another.",
+    "civilStatus should be a concise value such as Single or Married.",
+    "gender should be a concise value such as Male or Female.",
+    "dateOfBirth must use YYYY-MM-DD.",
+    "age must be numerically consistent with dateOfBirth at the time of application.",
+    "Populate Ordinary Level qualification rows consecutively from ordinaryLevelQualification1. Each row should contain a concise qualification/result entry, for example 'English - A'. Return an empty string for unused rows.",
+    "Populate Advanced Level qualification rows consecutively from advancedLevelQualification1. Each row should contain a concise subject/result entry. Return an empty string for unused rows.",
+    "otherQualifications may contain short relevant certificates, diplomas, language qualifications, professional qualifications, or training details. If none are applicable, return an empty string.",
+    "additionalStatement is optional. Use it only for concise relevant information the applicant wishes to declare; otherwise return an empty string.",
+    "applicationDate must use YYYY-MM-DD and must be later than dateOfBirth.",
+    "Keep generated values concise enough to fit naturally within their assigned boxes and lines.",
+    "Use only synthetic names, identifiers, addresses, telephone numbers, and educational records. Do not knowingly generate real personal identifiers.",
+    "Return values using exactly the field keys defined in the fields array. Do not invent additional ordinary text fields.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, logos, signatures, or scan watermarks. Those are already represented in the static annotation template.",
+    "applicantSignature is represented separately as a Signature region and should not be returned as an ordinary text value unless the rendering pipeline explicitly supports synthetic signature-image assets."
+  ],
+
+  fields: [
+    {
+      key: "applicantNameWithInitials",
+      labelSi: "අයදුම්කරුගේ මුලකුරු සමඟ නම",
+      labelEn: "Name of Applicant with Initials",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "nationalIdentityCardNumber",
+      labelSi: "ජාතික හැඳුනුම්පත් අංකය",
+      labelEn: "National ID Card Number",
+      type: "nic",
+      required: true,
+    },
+    {
+      key: "phoneNumber",
+      labelSi: "දුරකථන අංකය",
+      labelEn: "Phone Number",
+      type: "phone",
+      required: true,
+    },
+    {
+      key: "whatsAppNumber",
+      labelSi: "WhatsApp අංකය",
+      labelEn: "WhatsApp Number",
+      type: "phone",
+      required: true,
+    },
+    {
+      key: "address",
+      labelSi: "ලිපිනය",
+      labelEn: "Address",
+      type: "address",
+      required: true,
+    },
+    {
+      key: "divisionalSecretarialOffice",
+      labelSi: "ප්‍රාදේශීය ලේකම් කොට්ඨාසය",
+      labelEn: "Divisional Secretarial Office",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "district",
+      labelSi: "දිස්ත්‍රික්කය",
+      labelEn: "District",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "civilStatus",
+      labelSi: "විවාහක / අවිවාහක බව",
+      labelEn: "Civil Status",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "gender",
+      labelSi: "ස්ත්‍රී / පුරුෂ භාවය",
+      labelEn: "Gender",
+      type: "text",
+      required: true,
+    },
+    {
+      key: "dateOfBirth",
+      labelSi: "උපන් දිනය",
+      labelEn: "Date of Birth",
+      type: "date",
+      required: true,
+      helpTextSi: "YYYY-MM-DD ආකෘතිය භාවිතා කරන්න.",
+    },
+    {
+      key: "age",
+      labelSi: "වයස",
+      labelEn: "Age",
+      type: "number",
+      required: true,
+    },
+
+    // ------------------------------------------------------------
+    // Educational Qualifications - Ordinary Level
+    // ------------------------------------------------------------
+    {
+      key: "ordinaryLevelQualification1",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 1",
+      labelEn: "Ordinary Level Qualification 1",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification2",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 2",
+      labelEn: "Ordinary Level Qualification 2",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification3",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 3",
+      labelEn: "Ordinary Level Qualification 3",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification4",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 4",
+      labelEn: "Ordinary Level Qualification 4",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification5",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 5",
+      labelEn: "Ordinary Level Qualification 5",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification6",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 6",
+      labelEn: "Ordinary Level Qualification 6",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification7",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 7",
+      labelEn: "Ordinary Level Qualification 7",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification8",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 8",
+      labelEn: "Ordinary Level Qualification 8",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification9",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 9",
+      labelEn: "Ordinary Level Qualification 9",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "ordinaryLevelQualification10",
+      labelSi: "අ.පො.ස. සාමාන්‍ය පෙළ සුදුසුකම 10",
+      labelEn: "Ordinary Level Qualification 10",
+      type: "text",
+      required: false,
+    },
+
+    // ------------------------------------------------------------
+    // Educational Qualifications - Advanced Level
+    // ------------------------------------------------------------
+    {
+      key: "advancedLevelQualification1",
+      labelSi: "අ.පො.ස. උසස් පෙළ සුදුසුකම 1",
+      labelEn: "Advanced Level Qualification 1",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "advancedLevelQualification2",
+      labelSi: "අ.පො.ස. උසස් පෙළ සුදුසුකම 2",
+      labelEn: "Advanced Level Qualification 2",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "advancedLevelQualification3",
+      labelSi: "අ.පො.ස. උසස් පෙළ සුදුසුකම 3",
+      labelEn: "Advanced Level Qualification 3",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "advancedLevelQualification4",
+      labelSi: "අ.පො.ස. උසස් පෙළ සුදුසුකම 4",
+      labelEn: "Advanced Level Qualification 4",
+      type: "text",
+      required: false,
+    },
+
+    {
+      key: "otherQualifications",
+      labelSi: "අමතර සුදුසුකම්",
+      labelEn: "Other Qualifications",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "additionalStatement",
+      labelSi: "අමතර ප්‍රකාශය",
+      labelEn: "Additional Statement",
+      type: "text",
+      required: false,
+    },
+    {
+      key: "applicationDate",
+      labelSi: "දිනය",
+      labelEn: "Date",
+      type: "date",
+      required: true,
+      helpTextSi: "YYYY-MM-DD ආකෘතිය භාවිතා කරන්න.",
+    },
+  ],
+};

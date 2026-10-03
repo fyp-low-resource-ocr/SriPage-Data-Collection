@@ -10,7 +10,7 @@ export const childrenDeletionFormDefinition: DataCollectionForm = {
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds to a {{fieldKey}} placeholder in the static OCR/layout annotation template.",
+    "Each generated field value corresponds to a {{fieldKey}} placeholder in the Firebase OCR/layout annotation template.",
     "When applying generated values to the document, replace only the matching placeholder. Do not modify printed OCR text, bounding boxes, labels, reading order, page number, tables, or any other layout metadata.",
     "Generate details for between one and six children to be deleted from the travel document.",
     "Use the child rows consecutively starting from child 1. After the last generated child, return an empty string for every field belonging to all remaining unused child rows so those placeholders remain visually blank.",
@@ -27,7 +27,7 @@ export const childrenDeletionFormDefinition: DataCollectionForm = {
     "Do not generate values for any area marked 'For office use only'.",
     "Do not return values for printed instructions, headings, tables, labels, page footer text, or other fixed OCR content.",
     "Return values using exactly the field keys defined in the fields array. Do not invent extra text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. These are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. These are already stored in the Firebase annotation template.",
     "The applicant signature and spouse/legal-guardian signature are represented separately as Signature regions in the annotation template. Do not return them as ordinary text unless the rendering pipeline explicitly supports synthetic signature image assets."
   ],
 

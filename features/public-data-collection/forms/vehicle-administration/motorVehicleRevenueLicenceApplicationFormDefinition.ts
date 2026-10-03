@@ -11,7 +11,7 @@ export const motorVehicleRevenueLicenceApplicationFormDefinition: DataCollection
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds either to a {{fieldKey}} placeholder or to a printed choice-control region in the static OCR/layout annotation template.",
+    "Each generated field value corresponds either to a {{fieldKey}} placeholder or to a printed choice-control region in the Firebase OCR/layout annotation template.",
     "When applying generated values, replace only matching placeholders or use the value to resolve the corresponding printed alternative. Do not modify unrelated OCR text, bounding boxes, labels, reading order, page numbers, or layout metadata.",
     "Generate a realistic synthetic Sri Lankan motor vehicle revenue licence application.",
     "vehicleNumber, vehicleClass, fuelType, chassisNumber, engineNumber, dateOfFirstRegistration, tare weight, passengerSeats, and tyreType must describe the same vehicle.",
@@ -33,7 +33,7 @@ export const motorVehicleRevenueLicenceApplicationFormDefinition: DataCollection
     "Use only synthetic vehicle, owner, registration, and address information. Do not knowingly generate real personal identifiers.",
     "Do not generate any values for the 'For Office Use Only' control-number box on page 1 or any CMT office / Kachcheri section on page 2.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional ordinary text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. These are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. These are already stored in the Firebase annotation template.",
     "The registered owner's signature is represented separately as a Signature region in the annotation template and should not be returned as an ordinary text value unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 

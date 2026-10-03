@@ -1,121 +1,18 @@
 import "server-only";
 
 import { FieldValue } from "firebase-admin/firestore";
-import {
-  epfDFormAnnotationMetadata,
-  epfDFormAnnotations,
-  type SriPageAnnotation,
-} from "../../forms/epf/epf-d-form-annotations";
-import {
-  epfKFormAnnotationMetadata,
-  epfKFormAnnotations,
-} from "../../forms/epf/epf-k-form-annotations";
-import {
-  amendmentsAlterationsAnnotationMetadata,
-  amendmentsAlterationsAnnotations,
-} from "../../forms/imigration-and-emigration/amendments-alterations-annotations";
-import {
-  childrenDeletionAnnotationMetadata,
-  childrenDeletionAnnotations,
-} from "../../forms/imigration-and-emigration/children-deletion-annotations";
-import {
-  dualCitizenshipAnnex03AnnotationMetadata,
-  dualCitizenshipAnnex03Annotations,
-} from "../../forms/imigration-and-emigration/dual-citizenship-annex-03-annotations";
-import {
-  indianOriginCitizenshipCertificateAnnotationMetadata,
-  indianOriginCitizenshipCertificateAnnotations,
-} from "../../forms/imigration-and-emigration/indian-origin-citizenship-certificate-annotations";
-import {
-  indianOriginSpecialDeclarationAnnotationMetadata,
-  indianOriginSpecialDeclarationAnnotations,
-} from "../../forms/imigration-and-emigration/indian-origin-special-declaration-annotations";
-import {
-  separatePassportChildAnnotationMetadata,
-  separatePassportChildAnnotations,
-} from "../../forms/imigration-and-emigration/separate-passport-child-annotations";
-import {
-  indianOriginCitizenshipCertificateIssuedAnnotationMetadata,
-  indianOriginCitizenshipCertificateIssuedAnnotations,
-} from "../../forms/national-identity-documents/indian-origin-citizenship-certificate-issued-annotations";
-import {
-  motorVehicleRegistrationParticularsChangeAnnotationMetadata,
-  motorVehicleRegistrationParticularsChangeAnnotations,
-} from "../../forms/vehicle-administration/motor-vehicle-registration-particulars-change-annotations";
-import {
-  motorVehicleRevenueLicenceApplicationAnnotationMetadata,
-  motorVehicleRevenueLicenceApplicationAnnotations,
-} from "../../forms/vehicle-administration/motor-vehicle-revenue-licence-application-annotations";
-import {
-  motorVehicleWeightCertificateApplicationAnnotationMetadata,
-  motorVehicleWeightCertificateApplicationAnnotations,
-} from "../../forms/vehicle-administration/motor-vehicle-weight-certificate-application-annotations";
-import {
-  tinNumberCertificationAffidavitAnnotationMetadata,
-  tinNumberCertificationAffidavitAnnotations,
-} from "../../forms/vehicle-administration/tin-number-certification-affidavit-annotations";
+import type { AnnotationDocument, AnnotationMetadata, SriPageAnnotation } from "../../forms/annotation-types";
 import type { DataCollectionForm } from "../../forms/types";
 import type { SyntheticSinhalaFormDetails } from "../../lib/gemini/form-details-generator";
+import { getFormAnnotationTemplate } from "./form-annotation-templates-repository";
 import { getPublicDataCollectionFirestore } from "./firebase-admin";
 
 type ReviewStatus = "pending" | "approved";
-type AnnotationMetadata = {
-  id: string;
-  name: string;
-  source: string;
-  [key: string]: unknown;
-};
-type AnnotationTemplate = {
-  metadata: AnnotationMetadata;
-  annotations: SriPageAnnotation[];
-};
-
-const annotationTemplatesByFormId: Record<string, AnnotationTemplate> = Object.fromEntries(
-  [
-    { metadata: epfDFormAnnotationMetadata, annotations: epfDFormAnnotations },
-    { metadata: epfKFormAnnotationMetadata, annotations: epfKFormAnnotations },
-    { metadata: amendmentsAlterationsAnnotationMetadata, annotations: amendmentsAlterationsAnnotations },
-    { metadata: childrenDeletionAnnotationMetadata, annotations: childrenDeletionAnnotations },
-    { metadata: dualCitizenshipAnnex03AnnotationMetadata, annotations: dualCitizenshipAnnex03Annotations },
-    {
-      metadata: indianOriginCitizenshipCertificateAnnotationMetadata,
-      annotations: indianOriginCitizenshipCertificateAnnotations,
-    },
-    {
-      metadata: indianOriginSpecialDeclarationAnnotationMetadata,
-      annotations: indianOriginSpecialDeclarationAnnotations,
-    },
-    { metadata: separatePassportChildAnnotationMetadata, annotations: separatePassportChildAnnotations },
-    {
-      metadata: indianOriginCitizenshipCertificateIssuedAnnotationMetadata,
-      annotations: indianOriginCitizenshipCertificateIssuedAnnotations,
-    },
-    {
-      metadata: motorVehicleRegistrationParticularsChangeAnnotationMetadata,
-      annotations: motorVehicleRegistrationParticularsChangeAnnotations,
-    },
-    {
-      metadata: motorVehicleRevenueLicenceApplicationAnnotationMetadata,
-      annotations: motorVehicleRevenueLicenceApplicationAnnotations,
-    },
-    {
-      metadata: motorVehicleWeightCertificateApplicationAnnotationMetadata,
-      annotations: motorVehicleWeightCertificateApplicationAnnotations,
-    },
-    {
-      metadata: tinNumberCertificationAffidavitAnnotationMetadata,
-      annotations: tinNumberCertificationAffidavitAnnotations,
-    },
-  ].map((template) => [template.metadata.id, template]),
-);
 
 export type SavedGeneratedFormDetails = {
   uniqueFormName: string;
   status: ReviewStatus;
-  annotationsJson: {
-    metadata: AnnotationMetadata;
-    annotations: SriPageAnnotation[];
-  } | null;
+  annotationsJson: AnnotationDocument | null;
 };
 
 type SaveGeneratedFormDetailsOptions = {
@@ -131,6 +28,7 @@ export async function saveGeneratedFormDetails({
   const db = getPublicDataCollectionFirestore();
   const collection = db.collection("formDetails");
   const uniqueFormNameBase = normalizeFormName(form.nameEn || form.id);
+  const annotationsJson = await buildAnnotationsJson(form, profile.details);
 
   const savedRecord = await db.runTransaction(async (transaction) => {
     const counterRef = db.collection("formDetailsCounters").doc(uniqueFormNameBase);
@@ -145,7 +43,6 @@ export async function saveGeneratedFormDetails({
       getNextNumberFromExistingForms(uniqueFormNameBase, existingFormsSnapshot.docs),
     );
     const uniqueFormName = `${uniqueFormNameBase}_${nextNumber}`;
-    const annotationsJson = buildAnnotationsJson(form, profile.details);
     const document = collection.doc();
 
     transaction.set(document, {
@@ -204,7 +101,11 @@ export async function approveSavedGeneratedFormDetails(
 
   const existing = document.data() as Partial<SavedGeneratedFormDetails>;
   const annotationsJson = {
-    metadata: existing.annotationsJson?.metadata ?? epfDFormAnnotationMetadata,
+    metadata: existing.annotationsJson?.metadata ?? {
+      id: uniqueFormName,
+      name: uniqueFormName,
+      source: "",
+    },
     annotations,
   };
 
@@ -249,13 +150,15 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function buildAnnotationsJson(form: DataCollectionForm, details: Record<string, string>) {
-  const template = annotationTemplatesByFormId[form.id];
-  if (!template) return null;
+async function buildAnnotationsJson(form: DataCollectionForm, details: Record<string, string>) {
+  const template = await getFormAnnotationTemplate(form.id);
+  if (!template) {
+    throw new Error(`No approved annotation template found for ${form.nameEn}. Upload and save a template in admin first.`);
+  }
 
   return buildAnnotationDocument({
-    metadata: template.metadata,
-    annotations: template.annotations,
+    metadata: template.annotationsJson.metadata,
+    annotations: template.annotationsJson.annotations,
     details,
   });
 }

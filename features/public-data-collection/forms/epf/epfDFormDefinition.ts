@@ -10,7 +10,7 @@ export const epfDFormDefinition: DataCollectionForm = {
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds to a placeholder in the static OCR/layout annotation template. For example, the value generated for establishmentName will replace {{establishmentName}}.",
+    "Each generated field value corresponds to a placeholder in the Firebase OCR/layout annotation template. For example, the value generated for establishmentName will replace {{establishmentName}}.",
     "When applying generated values to the document, replace only the matching {{fieldKey}} placeholder. Do not modify any other OCR text in the document.",
     "Do not modify the page number, bounding box, annotation label, reading order, or any other annotation metadata when replacing a placeholder.",
     "Keep generated values concise enough to fit naturally inside the bounding box assigned to the corresponding placeholder.",
@@ -21,7 +21,7 @@ export const epfDFormDefinition: DataCollectionForm = {
     "If there is no provident fund or contributory pension scheme, providentOrPensionSchemeDetails must be අදාළ නොවේ.",
     "Declarant, employer, proprietor or lessee, and manager names should be plausible Sri Lankan names and should not refer to real public figures.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional field keys.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
   ],
 
   fields: [

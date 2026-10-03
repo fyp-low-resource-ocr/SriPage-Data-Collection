@@ -11,7 +11,7 @@ export const indianOriginSpecialDeclarationFormDefinition: DataCollectionForm = 
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds to one or more {{fieldKey}} placeholders or choice-control regions in the static OCR/layout annotation template.",
+    "Each generated field value corresponds to one or more {{fieldKey}} placeholders or choice-control regions in the Firebase OCR/layout annotation template.",
     "The declaration is printed in Sinhala, Tamil, and English. The same generated value must be reused for every occurrence of the same fieldKey across all language versions.",
     "When applying generated values, replace only the matching placeholders or use the value to resolve a delete-whichever-is-inapplicable choice. Do not modify unrelated fixed OCR text, bounding boxes, labels, reading order, page numbers, or other layout metadata.",
     "This form applies only to persons holding an Indian passport or another similar document.",
@@ -34,7 +34,7 @@ export const indianOriginSpecialDeclarationFormDefinition: DataCollectionForm = 
     "Do not generate any value for the 'For official use / Ref No.' area.",
     "Keep generated values concise enough to fit naturally within their assigned bounding boxes.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
     "Applicant signature/thumb impression and Justice of the Peace/Commissioner signature are represented separately as Signature regions in the annotation template and should not be returned as ordinary text unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 

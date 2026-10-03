@@ -11,7 +11,7 @@ export const tinNumberCertificationAffidavitFormDefinition: DataCollectionForm =
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds either to a {{fieldKey}} placeholder or to a printed choice-control region in the static OCR/layout annotation template.",
+    "Each generated field value corresponds either to a {{fieldKey}} placeholder or to a printed choice-control region in the Firebase OCR/layout annotation template.",
     "When applying generated values, replace only matching placeholders or use the value to resolve the relevant printed choice. Do not modify unrelated OCR text, bounding boxes, labels, reading order, page number, or layout metadata.",
     "Generate a realistic synthetic affidavit relating to an imported motor vehicle and the declarant's taxpayer registration.",
     "The declarantName, declarantNicNumber, declarantAddress, ethnicity, and religion must describe the same synthetic person.",
@@ -32,7 +32,7 @@ export const tinNumberCertificationAffidavitFormDefinition: DataCollectionForm =
     "Keep generated values concise enough to fit naturally within their assigned bounding boxes.",
     "Use only synthetic personal, customs, vehicle, and taxpayer identifiers. Do not knowingly generate real personal identifiers.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional ordinary text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
     "The declarant signature is represented separately as a Signature region in the annotation template and should not be returned as an ordinary text value unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 

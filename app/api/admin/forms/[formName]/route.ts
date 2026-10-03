@@ -33,6 +33,8 @@ const annotationSchema = z.object({
   fieldKey: z.string().trim().min(1).optional(),
   placeholder: z.boolean().optional(),
   notes: z.string().max(2000).optional(),
+  renderMode: z.string().trim().min(1).max(120).optional(),
+  preprintedYear: z.number().int().positive().optional(),
 }).refine((annotation) => annotation.bbox[2] > annotation.bbox[0] && annotation.bbox[3] > annotation.bbox[1], {
   message: "Bounding box must have positive width and height.",
   path: ["bbox"],

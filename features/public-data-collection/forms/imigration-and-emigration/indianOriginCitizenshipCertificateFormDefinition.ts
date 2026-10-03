@@ -11,7 +11,7 @@ export const indianOriginCitizenshipCertificateFormDefinition: DataCollectionFor
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds either to a visible {{fieldKey}} placeholder or to a choice-control region in the static OCR/layout annotation template.",
+    "Each generated field value corresponds either to a visible {{fieldKey}} placeholder or to a choice-control region in the Firebase OCR/layout annotation template.",
     "When applying generated values to the document, do not modify fixed OCR text, bounding boxes, labels, reading order, page numbers, or other layout metadata.",
     "Generate the application either for the applicant personally or for the applicant's minor child, according to the wording of the form.",
     "applicationFor must be exactly තමා සඳහා or බාලවයස්කාර දරුවා සඳහා.",
@@ -37,7 +37,7 @@ export const indianOriginCitizenshipCertificateFormDefinition: DataCollectionFor
     "All identifiers and addresses must be synthetic. Do not knowingly generate real personal identifiers.",
     "Keep generated values concise enough to fit naturally within their assigned bounding boxes.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
     "Applicant signatures/thumb impressions and Justice of the Peace/Commissioner signatures are represented separately as Signature regions in the annotation template and should not be returned as ordinary text values unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 

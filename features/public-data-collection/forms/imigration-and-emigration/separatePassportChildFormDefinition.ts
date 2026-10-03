@@ -10,7 +10,7 @@ export const separatePassportChildRequestFormDefinition: DataCollectionForm = {
 
   generationGuidance: [
     "Generate values only for the fields defined in this form.",
-    "Each generated field value corresponds to one or more {{fieldKey}} placeholders in the static OCR/layout annotation template.",
+    "Each generated field value corresponds to one or more {{fieldKey}} placeholders in the Firebase OCR/layout annotation template.",
     "The same consent letter is printed in Sinhala, Tamil, and English. The same generated value must therefore be used for every occurrence of the same fieldKey across all language versions.",
     "When applying generated values, replace only the matching placeholder. Do not modify fixed OCR text, bounding boxes, labels, reading order, page numbers, or other layout metadata.",
     "senderName must be one of the two parents named in the consent letter, unless a different synthetic parent/guardian sender is intentionally required by your application logic.",
@@ -22,7 +22,7 @@ export const separatePassportChildRequestFormDefinition: DataCollectionForm = {
     "The mother's and father's identifiers must be different from each other and must not knowingly correspond to real persons.",
     "Keep generated names and identifiers concise enough to fit naturally within the available dotted-line regions.",
     "Return values using exactly the field keys defined in the fields array. Do not invent additional text fields.",
-    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the static annotation template.",
+    "Do not return OCR text, bounding boxes, labels, reading order, page numbers, or layout information. Those are already stored in the Firebase annotation template.",
     "The mother and father signatures are represented separately as Signature regions in the annotation template. Do not return signatures as ordinary text values unless the rendering pipeline explicitly supports synthetic signature-image assets."
   ],
 

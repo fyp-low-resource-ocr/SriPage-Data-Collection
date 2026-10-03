@@ -23,3 +23,9 @@ export const VEHICLE_ADMINISTRATION_CATEGORY: DataCollectionCategory = {
   nameSi: "මෝටර් වාහන කළමනාකරණය",
   nameEn: "Vehicle Administration",
 };
+
+export const EDUCATION_CATEGORY: DataCollectionCategory = {
+  id: "education",
+  nameSi: "අධ්‍යාපනය",
+  nameEn: "Education",
+};
