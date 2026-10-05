@@ -54,7 +54,10 @@ export async function generateSyntheticSinhalaFormDetails({
           },
         ],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.9,
+          topP: 0.95,
+          topK: 40,
+          candidateCount: 1,
           maxOutputTokens: 4096,
           responseMimeType: "application/json",
           responseSchema: buildGeminiResponseSchema(form),
