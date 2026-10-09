@@ -34,6 +34,10 @@ const LABELS: SriPageLabel[] = [
   "Stamp",
 ];
 
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 2.2;
+const ZOOM_STEP = 0.15;
+
 export function AdminFormWorkspace({
   savedForm,
   templateDraft,
@@ -322,11 +326,21 @@ export function AdminFormWorkspace({
               </button>
             </div>
             <div className="tool-group">
-              <button className="tool-button" title="Zoom out" onClick={() => setZoom((value) => Math.max(.55, value - .15))}>
+              <button
+                className="tool-button"
+                title="Zoom out"
+                onClick={() => setZoom((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP))}
+                disabled={zoom <= MIN_ZOOM}
+              >
                 <ZoomOut size={15} />
               </button>
               <span className="zoom-readout">{Math.round(zoom * 100)}%</span>
-              <button className="tool-button" title="Zoom in" onClick={() => setZoom((value) => Math.min(2.2, value + .15))}>
+              <button
+                className="tool-button"
+                title="Zoom in"
+                onClick={() => setZoom((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP))}
+                disabled={zoom >= MAX_ZOOM}
+              >
                 <ZoomIn size={15} />
               </button>
             </div>
