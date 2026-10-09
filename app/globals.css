@@ -368,6 +368,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   stroke: #b56d15;
   stroke-width: 3;
 }
+.admin-annotation-group {
+  fill: rgba(18,59,46,.035);
+  stroke: #123b2e;
+  stroke-width: 2;
+  stroke-dasharray: 8 5;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
+}
+.admin-group-resize-handle { cursor: nwse-resize; }
 .admin-selected-text {
   padding: 12px;
   color: var(--ink);
