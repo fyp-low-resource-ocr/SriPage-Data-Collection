@@ -311,6 +311,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tool-button { height: 32px; min-width: 32px; padding: 0 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; font-size: 11px; }
 .tool-button:hover { background: #eef1ed; }
 .tool-button.active { color: var(--forest); border-color: #bcd3c7; background: var(--mint); }
+.tool-button:disabled { opacity: .42; cursor: not-allowed; }
+.admin-group-selection-action { min-width: auto; padding-inline: 7px; }
+.group-selection-count { margin-left: 2px; color: var(--muted); font-size: 10px; white-space: nowrap; }
 .admin-pdf-toolbar-upload { position: relative; overflow: hidden; }
 .admin-pdf-toolbar-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .zoom-readout { min-width: 46px; text-align: center; font-size: 11px; color: var(--muted); }
@@ -374,8 +377,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   stroke-width: 2;
   stroke-dasharray: 8 5;
   vector-effect: non-scaling-stroke;
-  cursor: move;
 }
+.admin-group-move-handle { fill: #123b2e; stroke: white; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: move; }
 .admin-group-resize-handle { cursor: nwse-resize; }
 .admin-selected-text {
   padding: 12px;

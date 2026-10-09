@@ -61,6 +61,7 @@ export function AdminFormWorkspace({
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(annotations[0]?.id ?? null);
+  const [groupSelection, setGroupSelection] = useState<string[]>([]);
   const [drawStart, setDrawStart] = useState<Point | null>(null);
   const [drawCurrent, setDrawCurrent] = useState<Point | null>(null);
   const interactionRef = useRef<{
@@ -78,7 +79,11 @@ export function AdminFormWorkspace({
     [annotations, pageIndex],
   );
   const selected = annotations.find((annotation) => annotation.id === selectedId) ?? null;
-  const groupBounds = useMemo(() => getGroupBounds(pageAnnotations), [pageAnnotations]);
+  const groupAnnotations = useMemo(
+    () => pageAnnotations.filter((annotation) => groupSelection.includes(annotation.id)),
+    [groupSelection, pageAnnotations],
+  );
+  const groupBounds = useMemo(() => getGroupBounds(groupAnnotations), [groupAnnotations]);
 
   useEffect(() => () => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
@@ -103,6 +108,7 @@ export function AdminFormWorkspace({
     });
     setPdfName(file.name);
     setPageIndex(0);
+    setGroupSelection([]);
     setPageSize({ width: 0, height: 0 });
     setSaveError("");
   }
@@ -126,6 +132,12 @@ export function AdminFormWorkspace({
 
   function startMove(event: React.PointerEvent<SVGRectElement>, annotation: AdminAnnotation) {
     event.stopPropagation();
+    if (tool === "transform-all") {
+      setGroupSelection((current) => current.includes(annotation.id)
+        ? current.filter((id) => id !== annotation.id)
+        : [...current, annotation.id]);
+      return;
+    }
     setSelectedId(annotation.id);
     if (tool !== "select") return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -156,7 +168,7 @@ export function AdminFormWorkspace({
     interactionRef.current = {
       type,
       start: pointFromEvent(event),
-      annotations: pageAnnotations,
+      annotations: groupAnnotations,
       bounds: groupBounds,
     };
   }
@@ -332,6 +344,7 @@ export function AdminFormWorkspace({
               onPageChange={(page) => {
                 setPageIndex(page);
                 setSelectedId(null);
+                setGroupSelection([]);
               }}
             />
           )}
@@ -352,15 +365,37 @@ export function AdminFormWorkspace({
               </button>
               <button
                 className={`tool-button ${tool === "transform-all" ? "active" : ""}`}
-                title="Move or scale all annotations on this page"
+                title="Select multiple annotations to move or scale together"
                 onClick={() => {
                   setTool("transform-all");
                   setSelectedId(null);
+                  setGroupSelection([]);
                 }}
                 disabled={!pageAnnotations.length}
               >
                 <BoxSelect size={16} />
               </button>
+              {tool === "transform-all" && (
+                <>
+                  <button
+                    className="tool-button admin-group-selection-action"
+                    type="button"
+                    onClick={() => setGroupSelection(pageAnnotations.map((annotation) => annotation.id))}
+                    disabled={groupSelection.length === pageAnnotations.length}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    className="tool-button admin-group-selection-action"
+                    type="button"
+                    onClick={() => setGroupSelection([])}
+                    disabled={!groupSelection.length}
+                  >
+                    Clear
+                  </button>
+                  <span className="group-selection-count">{groupAnnotations.length} selected</span>
+                </>
+              )}
               <button className={`tool-button ${tool === "draw" ? "active" : ""}`} title="Draw annotation" onClick={() => setTool("draw")}>
                 <Plus size={16} />
               </button>
@@ -417,7 +452,7 @@ export function AdminFormWorkspace({
                     onPointerMove={pointerMove}
                     onPointerUp={pointerUp}
                     onPointerCancel={pointerUp}
-                    style={{ cursor: tool === "draw" ? "crosshair" : tool === "transform-all" ? "move" : "default" }}
+                    style={{ cursor: tool === "draw" ? "crosshair" : "default" }}
                   >
                     {pageAnnotations.map((annotation) => {
                       const box = normalizeSriPageBBox(annotation.bbox);
@@ -428,7 +463,7 @@ export function AdminFormWorkspace({
                             y={box.y * pageSize.height}
                             width={box.width * pageSize.width}
                             height={box.height * pageSize.height}
-                            className={`admin-annotation-box ${annotation.id === selectedId || tool === "transform-all" ? "active" : ""}`}
+                            className={`admin-annotation-box ${annotation.id === selectedId || (tool === "transform-all" && groupSelection.includes(annotation.id)) ? "active" : ""}`}
                             onPointerDown={(event) => startMove(event, annotation)}
                           />
                           {annotation.id === selectedId && tool === "select" && (
@@ -453,6 +488,13 @@ export function AdminFormWorkspace({
                             width={((x2 - x1) / 1000) * pageSize.width}
                             height={((y2 - y1) / 1000) * pageSize.height}
                             className="admin-annotation-group"
+                            pointerEvents="none"
+                          />
+                          <circle
+                            cx={(((x1 + x2) / 2) / 1000) * pageSize.width}
+                            cy={(((y1 + y2) / 2) / 1000) * pageSize.height}
+                            r={9}
+                            className="admin-group-move-handle"
                             onPointerDown={(event) => startGroupTransform(event, "move-all")}
                           />
                           <circle
@@ -486,6 +528,12 @@ export function AdminFormWorkspace({
             <h2>{isTemplateMode ? "Template text" : "Stored text"}</h2>
             <p>{isTemplateMode ? "Text and bounding boxes loaded from the uploaded annotation JSON." : "Text and bounding boxes loaded from the saved formDetails document."}</p>
           </div>
+
+          {tool === "transform-all" && (
+            <div className="instruction">
+              Click boxes to add or remove them. Drag the center handle to move the selection, or the lower-right handle to scale it.
+            </div>
+          )}
 
           <div className="panel-section">
             <h3>Review actions</h3>
