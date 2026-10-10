@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, BadgeCheck, Database, FileJson, FileText, Search, UploadCloud } from "lucide-react";
-import type { AnnotationDocument } from "@/features/public-data-collection/forms/annotation-types";
+import { annotationDocumentSchema, type AnnotationDocument } from "@/features/public-data-collection/forms/annotation-types";
 import type { DataCollectionForm } from "@/features/public-data-collection/forms/types";
 import type { FormAnnotationTemplateSummary } from "@/features/public-data-collection/server/firebase/form-annotation-templates-repository";
 import { AppBrand } from "./app-brand";
@@ -62,10 +62,12 @@ export function AdminDashboardClient({
         throw new Error("The empty form must be a PDF.");
       }
 
-      const parsed = JSON.parse(await jsonFile.text()) as Partial<AnnotationDocument>;
-      if (!parsed.metadata || !Array.isArray(parsed.annotations)) {
-        throw new Error("Annotation JSON must contain metadata and annotations.");
+      const result = annotationDocumentSchema.safeParse(JSON.parse(await jsonFile.text()));
+      if (!result.success) {
+        const issue = result.error.issues[0];
+        throw new Error(`Invalid annotation JSON${issue?.path.length ? ` at ${issue.path.join(".")}` : ""}: ${issue?.message ?? "unknown error"}`);
       }
+      const parsed = result.data;
 
       setTemplateDraft({
         formId: form.id,

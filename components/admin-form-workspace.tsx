@@ -2,8 +2,14 @@
 
 import { ArrowLeft, BoxSelect, Check, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AnnotationDocument, SriPageAnnotation, SriPageLabel } from "@/features/public-data-collection/forms/annotation-types";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  SRI_PAGE_LANGUAGES,
+  type AnnotationDocument,
+  type SriPageAnnotation,
+  type SriPageLabel,
+  type SriPageLanguage,
+} from "@/features/public-data-collection/forms/annotation-types";
 import type { SavedGeneratedFormDetails } from "@/features/public-data-collection/server/firebase/generated-form-details-repository";
 import { PdfPageCanvas, PdfThumbnails, usePdfDocument } from "./pdf-viewer";
 
@@ -34,6 +40,29 @@ const LABELS: SriPageLabel[] = [
   "Signature",
   "Stamp",
 ];
+
+const LABEL_COLORS: Record<SriPageLabel, { stroke: string; fill: string }> = {
+  "Printed text": { stroke: "#16803c", fill: "rgba(22, 128, 60, .10)" },
+  "Handwritten text": { stroke: "#d97706", fill: "rgba(217, 119, 6, .11)" },
+  Table: { stroke: "#2563eb", fill: "rgba(37, 99, 235, .08)" },
+  Title: { stroke: "#7c3aed", fill: "rgba(124, 58, 237, .10)" },
+  "Section-header": { stroke: "#9333ea", fill: "rgba(147, 51, 234, .09)" },
+  Logo: { stroke: "#db2777", fill: "rgba(219, 39, 119, .09)" },
+  "Page-header": { stroke: "#0891b2", fill: "rgba(8, 145, 178, .09)" },
+  "Page-footer": { stroke: "#0e7490", fill: "rgba(14, 116, 144, .09)" },
+  "List-item": { stroke: "#4f46e5", fill: "rgba(79, 70, 229, .09)" },
+  Footnote: { stroke: "#64748b", fill: "rgba(100, 116, 139, .10)" },
+  Signature: { stroke: "#dc2626", fill: "rgba(220, 38, 38, .09)" },
+  Stamp: { stroke: "#be123c", fill: "rgba(190, 18, 60, .10)" },
+};
+
+function annotationColorStyle(label: SriPageLabel): CSSProperties {
+  const color = LABEL_COLORS[label];
+  return {
+    "--annotation-stroke": color.stroke,
+    "--annotation-fill": color.fill,
+  } as CSSProperties;
+}
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.2;
@@ -463,7 +492,8 @@ export function AdminFormWorkspace({
                             y={box.y * pageSize.height}
                             width={box.width * pageSize.width}
                             height={box.height * pageSize.height}
-                            className={`admin-annotation-box ${annotation.id === selectedId || (tool === "transform-all" && groupSelection.includes(annotation.id)) ? "active" : ""}`}
+                            className={`admin-annotation-box ${annotation.id === selectedId || (tool === "transform-all" && groupSelection.includes(annotation.id)) ? "active" : ""} ${selected?.questionId && annotation.questionId === selected.questionId && annotation.id !== selected.id ? "linked" : ""}`}
+                            style={annotationColorStyle(annotation.label)}
                             onPointerDown={(event) => startMove(event, annotation)}
                           />
                           {annotation.id === selectedId && tool === "select" && (
@@ -582,6 +612,28 @@ export function AdminFormWorkspace({
                     onChange={(event) => updateAnnotation(selected.id, { readingOrder: Math.max(1, Number(event.target.value) || 1) })}
                   />
                 </div>
+                <div className="field">
+                  <label htmlFor="admin-annotation-question-id">Question ID</label>
+                  <input
+                    id="admin-annotation-question-id"
+                    className="input"
+                    value={selected.questionId ?? ""}
+                    onChange={(event) => updateAnnotation(selected.id, { questionId: event.target.value.trim() || undefined })}
+                    placeholder="q001"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="admin-annotation-language">Language</label>
+                  <select
+                    id="admin-annotation-language"
+                    className="select"
+                    value={selected.language ?? ""}
+                    onChange={(event) => updateAnnotation(selected.id, { language: (event.target.value || undefined) as SriPageLanguage | undefined })}
+                  >
+                    <option value="">Not specified</option>
+                    {SRI_PAGE_LANGUAGES.map((language) => <option key={language} value={language}>{language}</option>)}
+                  </select>
+                </div>
                 <dl className="admin-annotation-meta">
                   <div><dt>Page</dt><dd>{selected.page}</dd></div>
                 </dl>
@@ -621,7 +673,10 @@ export function AdminFormWorkspace({
                     setTool("select");
                   }}
                 >
-                  <strong>{annotation.readingOrder}. {annotation.label}</strong>
+                  <strong className="admin-annotation-label">
+                    <span className="admin-annotation-swatch" style={{ background: LABEL_COLORS[annotation.label].stroke }} />
+                    {annotation.readingOrder}. {annotation.label}
+                  </strong>
                   <span>{annotation.text || "(empty text)"}</span>
                 </button>
               ))}
@@ -691,6 +746,10 @@ function cleanAnnotationForSave(annotation: AdminAnnotation): AdminAnnotation {
   return {
     ...annotation,
     fieldKey: annotation.fieldKey?.trim() || undefined,
+    questionId: annotation.questionId?.trim() || undefined,
+    groupId: annotation.groupId?.trim() || undefined,
+    parentId: annotation.parentId?.trim() || undefined,
+    columnKey: annotation.columnKey?.trim() || undefined,
     notes: annotation.notes?.trim() || undefined,
   };
 }
