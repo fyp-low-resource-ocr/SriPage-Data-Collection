@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BoxSelect, Check, Download, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, BoxSelect, Check, Copy, Download, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
@@ -12,6 +12,9 @@ import {
   type SriPageLabel,
   type SriPageLanguage,
 } from "@/features/public-data-collection/forms/annotation-types";
+import { applyLlmValues, buildLlmValueRequest, parseLlmValues } from "@/features/public-data-collection/forms/annotation-llm-values";
+import type { DataCollectionForm } from "@/features/public-data-collection/forms/types";
+import { embedAnnotationValuesInPdf, isFilledAnswer } from "@/lib/client/embed-annotation-values";
 import type { SavedGeneratedFormDetails } from "@/features/public-data-collection/server/firebase/generated-form-details-repository";
 import { PdfPageCanvas, PdfThumbnails, usePdfDocument } from "./pdf-viewer";
 
@@ -73,9 +76,11 @@ const ZOOM_STEP = 0.15;
 export function AdminFormWorkspace({
   savedForm,
   templateDraft,
+  formDefinition,
 }: {
   savedForm?: SavedGeneratedFormDetails;
   templateDraft?: TemplateDraft;
+  formDefinition?: DataCollectionForm;
 }) {
   const isTemplateMode = Boolean(templateDraft);
   const initialAnnotationsJson = templateDraft?.annotationsJson ?? savedForm?.annotationsJson ?? null;
@@ -88,6 +93,12 @@ export function AdminFormWorkspace({
     source: "",
   });
   const [templateJsonText, setTemplateJsonText] = useState("");
+  const [llmValuesText, setLlmValuesText] = useState("");
+  const [llmCopyState, setLlmCopyState] = useState<"idle" | "copied">("idle");
+  const [llmApplyNote, setLlmApplyNote] = useState("");
+  const [pdfExportState, setPdfExportState] = useState<"idle" | "exporting">("idle");
+  const [pdfExportNote, setPdfExportNote] = useState("");
+  const [pdfExportIndex, setPdfExportIndex] = useState(1);
   const [status, setStatus] = useState(savedForm?.status ?? "template");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
@@ -331,12 +342,7 @@ export function AdminFormWorkspace({
   function exportTemplate() {
     if (!templateDraft) return;
     const template = getCurrentTemplateDocument(templateDraft, templateMetadata, annotations, pdfName, document?.numPages);
-    const blobUrl = URL.createObjectURL(new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" }));
-    const link = window.document.createElement("a");
-    link.href = blobUrl;
-    link.download = "template.json";
-    link.click();
-    URL.revokeObjectURL(blobUrl);
+    downloadBlob(new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" }), "template.json");
   }
 
   function loadTemplateString() {
@@ -353,6 +359,116 @@ export function AdminFormWorkspace({
       setTemplateJsonText("");
     } catch (reason) {
       setSaveError(getTemplateStringError(reason));
+    }
+  }
+
+  function getLlmRequestJson() {
+    if (!formDefinition) return "";
+    return `${JSON.stringify(buildLlmValueRequest(formDefinition, annotations), null, 2)}\n`;
+  }
+
+  async function copyLlmInput() {
+    try {
+      await navigator.clipboard.writeText(getLlmRequestJson());
+      setLlmCopyState("copied");
+      setSaveError("");
+      window.setTimeout(() => setLlmCopyState("idle"), 1800);
+    } catch {
+      setSaveError("Could not copy the LLM input. Use the download button instead.");
+    }
+  }
+
+  function downloadLlmInput() {
+    if (!formDefinition) return;
+    const blobUrl = URL.createObjectURL(new Blob([getLlmRequestJson()], { type: "application/json" }));
+    const link = window.document.createElement("a");
+    link.href = blobUrl;
+    link.download = `${formDefinition.id}-llm-input.json`;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+
+  function loadLlmValues() {
+    if (!formDefinition || !llmValuesText.trim()) return;
+    try {
+      const matchingKeys = new Set(annotations.flatMap((annotation) => (
+        annotation.label === "Handwritten text" && annotation.fieldKey ? [annotation.fieldKey] : []
+      )));
+      const values = parseLlmValues(llmValuesText, [...matchingKeys]);
+      const appliedCount = Object.keys(values).filter((key) => matchingKeys.has(key)).length;
+      setAnnotations((current) => applyLlmValues(current, values));
+      setLlmValuesText("");
+      setLlmApplyNote(`${appliedCount} field value${appliedCount === 1 ? "" : "s"} applied. Save when the document looks correct.`);
+      setSaveState("idle");
+      setSaveError("");
+    } catch (reason) {
+      setLlmApplyNote("");
+      setSaveError(reason instanceof SyntaxError
+        ? `Invalid JSON: ${reason.message}`
+        : reason instanceof Error ? reason.message : "Could not apply the LLM values.");
+    }
+  }
+
+  async function downloadFilledPdf() {
+    console.group("[filled-pdf-export] Export requested");
+    console.log("Preconditions", {
+      hasPdfDocument: Boolean(document),
+      pdfPages: document?.numPages ?? 0,
+      hasFormDefinition: Boolean(formDefinition),
+      pdfName,
+      exportIndex: pdfExportIndex,
+      annotationCount: annotations.length,
+    });
+    if (!document || !formDefinition) {
+      console.warn("[filled-pdf-export] Export stopped because the PDF document or form definition is missing.");
+      console.groupEnd();
+      return;
+    }
+    const filledAnswerCount = annotations.filter(isFilledAnswer).length;
+    console.log("Filled handwritten answers", filledAnswerCount);
+    if (!filledAnswerCount) {
+      setSaveError("Apply at least one LLM value before creating the filled PDF.");
+      console.warn("[filled-pdf-export] No applied handwritten values were found.");
+      console.groupEnd();
+      return;
+    }
+
+    setPdfExportState("exporting");
+    setPdfExportNote("");
+    setSaveError("");
+    try {
+      console.time("[filled-pdf-export] PDF rendering");
+      const blob = await embedAnnotationValuesInPdf({
+        pdfDocument: document,
+        annotations,
+        onProgress: setPdfExportNote,
+      });
+      console.timeEnd("[filled-pdf-export] PDF rendering");
+      console.log("Generated PDF blob", { size: blob.size, type: blob.type });
+      const currentTemplate = templateDraft
+        ? getCurrentTemplateDocument(templateDraft, templateMetadata, annotations, pdfName, document.numPages)
+        : {
+            metadata: templateMetadata,
+            annotations: annotations.map(cleanAnnotationForSave),
+          };
+      const exportBaseName = `${getFileBaseName(pdfName || formDefinition.id)}_${pdfExportIndex}`;
+      const jsonBlob = new Blob([`${JSON.stringify(currentTemplate, null, 2)}\n`], { type: "application/json" });
+      console.log("Prepared downloads", {
+        pdf: { filename: `${exportBaseName}.pdf`, size: blob.size },
+        json: { filename: `${exportBaseName}.json`, size: jsonBlob.size },
+      });
+      downloadBlob(blob, `${exportBaseName}.pdf`);
+      downloadBlob(jsonBlob, `${exportBaseName}.json`);
+      setPdfExportNote(`Downloaded ${exportBaseName}.pdf and ${exportBaseName}.json with ${filledAnswerCount} embedded value${filledAnswerCount === 1 ? "" : "s"}.`);
+      setPdfExportIndex((current) => current + 1);
+      console.log("[filled-pdf-export] Both download clicks were dispatched.");
+    } catch (reason) {
+      console.error("[filled-pdf-export] Export failed", reason);
+      setSaveError(reason instanceof Error ? reason.message : "Could not create the filled PDF.");
+      setPdfExportNote("");
+    } finally {
+      setPdfExportState("idle");
+      console.groupEnd();
     }
   }
 
@@ -610,6 +726,63 @@ export function AdminFormWorkspace({
               {saveState === "saved" && <div className="admin-save-note">{saveSuccessMessage}</div>}
             </div>
           </div>
+
+          {formDefinition && (
+            <div className="panel-section">
+              <h3>LLM sample values</h3>
+              <div className="form-grid">
+                <small className="admin-panel-help">Export the answerable fields, multilingual questions, guidance, and useful fixed text. Layout and bounding boxes are excluded.</small>
+                <button className="button button-secondary admin-approve-button" type="button" onClick={copyLlmInput}>
+                  {llmCopyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
+                  {llmCopyState === "copied" ? "LLM input copied" : "Copy LLM input"}
+                </button>
+                <button className="button button-secondary admin-approve-button" type="button" onClick={downloadLlmInput}>
+                  <Download size={16} />
+                  Download LLM input
+                </button>
+                <textarea
+                  className="textarea admin-template-json-text"
+                  value={llmValuesText}
+                  onChange={(event) => setLlmValuesText(event.target.value)}
+                  placeholder={'Paste {"values":{"fieldKey":"sample value"}} here'}
+                  aria-label="LLM-generated field values JSON"
+                  spellCheck={false}
+                />
+                <button className="button button-primary admin-approve-button" type="button" onClick={loadLlmValues} disabled={!llmValuesText.trim()}>
+                  Apply LLM values
+                </button>
+                <small>Only annotations with matching field keys are changed. Empty strings clear optional fields.</small>
+                {llmApplyNote && <div className="admin-save-note">{llmApplyNote}</div>}
+                <div className="field">
+                  <label htmlFor="admin-pdf-export-index">Export index</label>
+                  <input
+                    id="admin-pdf-export-index"
+                    className="input"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={pdfExportIndex}
+                    onChange={(event) => setPdfExportIndex(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
+                  />
+                  <small>
+                    Files: {getFileBaseName(pdfName || formDefinition.id)}_{pdfExportIndex}.pdf and {getFileBaseName(pdfName || formDefinition.id)}_{pdfExportIndex}.json
+                  </small>
+                </div>
+                <button
+                  className="button button-secondary admin-approve-button"
+                  type="button"
+                  onClick={downloadFilledPdf}
+                  disabled={!document || pdfExportState === "exporting"}
+                  title={!document ? "Upload or load the source PDF first" : "Embed applied values in the source form"}
+                >
+                  {pdfExportState === "exporting" ? <span className="spinner" /> : <Download size={16} />}
+                  {pdfExportState === "exporting" ? "Creating files…" : "Embed values & download files"}
+                </button>
+                {!document && <small>Load the source PDF to enable PDF download.</small>}
+                {pdfExportNote && <div className="admin-save-note">{pdfExportNote}</div>}
+              </div>
+            </div>
+          )}
 
           {isTemplateMode && (
             <div className="panel-section">
@@ -883,6 +1056,33 @@ function getApiErrorMessage(body: unknown, fallback: string) {
   const path = "path" in firstIssue && Array.isArray(firstIssue.path) ? firstIssue.path.join(".") : "";
   const message = typeof firstIssue.message === "string" ? firstIssue.message : "";
   return [error, path, message].filter(Boolean).join(" ");
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const blobUrl = URL.createObjectURL(blob);
+  console.log("[filled-pdf-export] Dispatching browser download", {
+    filename,
+    blobSize: blob.size,
+    blobType: blob.type,
+    blobUrl,
+  });
+  const link = window.document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  link.style.display = "none";
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(blobUrl);
+    console.log("[filled-pdf-export] Released download URL", { filename });
+  }, 30_000);
+}
+
+function getFileBaseName(filename: string) {
+  const leafName = filename.trim().split(/[\\/]/).at(-1) ?? "";
+  const withoutExtension = leafName.replace(/\.pdf$/i, "");
+  return withoutExtension || "filled-form";
 }
 
 function resizeBBox([x1, y1, x2, y2]: AdminAnnotation["bbox"], dx: number, dy: number): AdminAnnotation["bbox"] {

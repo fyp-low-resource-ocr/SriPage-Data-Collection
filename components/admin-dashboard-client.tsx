@@ -99,7 +99,12 @@ export function AdminDashboardClient({
   }
 
   if (templateDraft) {
-    return <AdminFormWorkspace templateDraft={templateDraft} />;
+    return (
+      <AdminFormWorkspace
+        templateDraft={templateDraft}
+        formDefinition={forms.find((form) => form.id === templateDraft.formId)}
+      />
+    );
   }
 
   return (
