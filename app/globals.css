@@ -275,6 +275,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   width: 100%; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); padding: 10px 12px;
 }
 .textarea { min-height: 82px; resize: vertical; }
+.admin-template-json-text { min-height: 150px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; }
 .input:hover, .select:hover, .textarea:hover { border-color: #bbc6bf; }
 .file-drop { padding: 22px; border: 1px dashed #aebbb3; border-radius: 12px; background: #f8faf8; text-align: center; }
 .file-drop input { width: 100%; }

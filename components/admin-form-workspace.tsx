@@ -1,11 +1,13 @@
 "use client";
 
-import { ArrowLeft, BoxSelect, Check, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, BoxSelect, Check, Download, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   SRI_PAGE_LANGUAGES,
+  annotationDocumentSchema,
   type AnnotationDocument,
+  type AnnotationMetadata,
   type SriPageAnnotation,
   type SriPageLabel,
   type SriPageLanguage,
@@ -79,6 +81,13 @@ export function AdminFormWorkspace({
   const initialAnnotationsJson = templateDraft?.annotationsJson ?? savedForm?.annotationsJson ?? null;
   const storedAnnotations = initialAnnotationsJson?.annotations;
   const [annotations, setAnnotations] = useState<AdminAnnotation[]>(() => storedAnnotations ?? []);
+  const [templateMetadata, setTemplateMetadata] = useState<AnnotationMetadata>(() => initialAnnotationsJson?.metadata ?? {
+    schemaVersion: "1.1",
+    id: templateDraft?.formId ?? "template",
+    name: templateDraft?.formName ?? "Template",
+    source: "",
+  });
+  const [templateJsonText, setTemplateJsonText] = useState("");
   const [status, setStatus] = useState(savedForm?.status ?? "template");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
@@ -299,15 +308,7 @@ export function AdminFormWorkspace({
     setSaveState("saving");
     setSaveError("");
     try {
-      const annotationsJson = {
-        metadata: {
-          ...templateDraft.annotationsJson.metadata,
-          id: templateDraft.formId,
-          name: templateDraft.formName,
-          source: templateDraft.annotationsJson.metadata.source || pdfName,
-        },
-        annotations: annotations.map(cleanAnnotationForSave),
-      };
+      const annotationsJson = getCurrentTemplateDocument(templateDraft, templateMetadata, annotations, pdfName, document?.numPages);
       const response = await fetch(`/api/admin/templates/${encodeURIComponent(templateDraft.formId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -327,12 +328,40 @@ export function AdminFormWorkspace({
     }
   }
 
+  function exportTemplate() {
+    if (!templateDraft) return;
+    const template = getCurrentTemplateDocument(templateDraft, templateMetadata, annotations, pdfName, document?.numPages);
+    const blobUrl = URL.createObjectURL(new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" }));
+    const link = window.document.createElement("a");
+    link.href = blobUrl;
+    link.download = "template.json";
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+
+  function loadTemplateString() {
+    if (!templateJsonText.trim()) return;
+    try {
+      const parsed = annotationDocumentSchema.parse(JSON.parse(templateJsonText));
+      setAnnotations(parsed.annotations);
+      setTemplateMetadata(parsed.metadata);
+      setSelectedId(parsed.annotations[0]?.id ?? null);
+      setPageIndex(0);
+      setGroupSelection([]);
+      setSaveState("idle");
+      setSaveError("");
+      setTemplateJsonText("");
+    } catch (reason) {
+      setSaveError(getTemplateStringError(reason));
+    }
+  }
+
   const drawBox = drawStart && drawCurrent ? normalizeSriPageBBox(bboxFromPoints(drawStart, drawCurrent)) : null;
   const workspaceTitle = templateDraft?.formName ?? savedForm?.uniqueFormName ?? "Annotation editor";
   const uploadPrompt = isTemplateMode ? "Upload empty PDF for template review" : "Upload filled PDF for review";
-  const emptyStateTitle = isTemplateMode ? "Upload the empty PDF for this template" : "Upload the filled PDF for this review";
+  const emptyStateTitle = isTemplateMode ? "No PDF loaded" : "Upload the filled PDF for this review";
   const emptyStateCopy = isTemplateMode
-    ? "The uploaded annotation JSON is editable here. Saving writes the corrected template to Firestore."
+    ? "A PDF is optional. You can review imported annotations, export the JSON, or upload a PDF to edit boxes visually."
     : "The annotations are loaded from Firestore. The uploaded filled PDF stays in this browser session and is not stored on the server.";
   const saveButtonLabel = isTemplateMode
     ? saveState === "saving" ? "Saving template..." : saveState === "saved" ? "Template saved" : "Save template"
@@ -572,9 +601,40 @@ export function AdminFormWorkspace({
                 {saveState === "saving" ? <span className="spinner" /> : saveState === "saved" ? <Check size={16} /> : <Save size={16} />}
                 {saveButtonLabel}
               </button>
+              {isTemplateMode && (
+                <button className="button button-secondary admin-approve-button" type="button" onClick={exportTemplate}>
+                  <Download size={16} />
+                  Export template.json
+                </button>
+              )}
               {saveState === "saved" && <div className="admin-save-note">{saveSuccessMessage}</div>}
             </div>
           </div>
+
+          {isTemplateMode && (
+            <div className="panel-section">
+              <h3>Load template string</h3>
+              <div className="form-grid">
+                <textarea
+                  className="textarea admin-template-json-text"
+                  value={templateJsonText}
+                  onChange={(event) => setTemplateJsonText(event.target.value)}
+                  placeholder={'{"metadata":{"schemaVersion":"1.1",...},"annotations":[]}'}
+                  aria-label="Template JSON string"
+                  spellCheck={false}
+                />
+                <button
+                  className="button button-secondary admin-approve-button"
+                  type="button"
+                  onClick={loadTemplateString}
+                  disabled={!templateJsonText.trim()}
+                >
+                  Load template string
+                </button>
+                <small>This replaces the annotations currently open in the editor.</small>
+              </div>
+            </div>
+          )}
 
           {selected && (
             <div className="panel-section">
@@ -752,6 +812,38 @@ function cleanAnnotationForSave(annotation: AdminAnnotation): AdminAnnotation {
     columnKey: annotation.columnKey?.trim() || undefined,
     notes: annotation.notes?.trim() || undefined,
   };
+}
+
+function getCurrentTemplateDocument(
+  templateDraft: TemplateDraft,
+  metadata: AnnotationMetadata,
+  annotations: AdminAnnotation[],
+  pdfName: string,
+  pageCount?: number,
+): AnnotationDocument {
+  return {
+    metadata: {
+      ...metadata,
+      id: templateDraft.formId,
+      name: templateDraft.formName,
+      source: templateDraft.annotationsJson.metadata.source || pdfName,
+      ...(pageCount ? { pages: pageCount } : {}),
+    },
+    annotations: annotations.map(cleanAnnotationForSave),
+  };
+}
+
+function getTemplateStringError(reason: unknown) {
+  if (reason instanceof SyntaxError) return `Invalid JSON: ${reason.message}`;
+  if (reason && typeof reason === "object" && "issues" in reason && Array.isArray(reason.issues)) {
+    const issue = reason.issues[0];
+    if (issue && typeof issue === "object") {
+      const path = "path" in issue && Array.isArray(issue.path) ? issue.path.join(".") : "";
+      const message = "message" in issue && typeof issue.message === "string" ? issue.message : "Invalid template.";
+      return `Invalid template${path ? ` at ${path}` : ""}: ${message}`;
+    }
+  }
+  return reason instanceof Error ? reason.message : "Could not load the template string.";
 }
 
 function getApiErrorMessage(body: unknown, fallback: string) {
