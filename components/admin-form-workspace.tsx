@@ -148,6 +148,51 @@ export function AdminFormWorkspace({
     }
   }, [templateDraft?.pdfFile]);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target;
+      if (
+        event.metaKey
+        || event.ctrlKey
+        || event.altKey
+        || (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']"))
+      ) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "v") {
+        event.preventDefault();
+        setTool("select");
+        setGroupSelection([]);
+        return;
+      }
+
+      if (key === "b" && pageAnnotations.length) {
+        event.preventDefault();
+        setTool("transform-all");
+        setSelectedId(null);
+        setGroupSelection([]);
+        return;
+      }
+
+      if (key !== "backspace" && key !== "delete") return;
+      const idsToDelete = tool === "transform-all"
+        ? groupSelection
+        : selectedId ? [selectedId] : [];
+      if (!idsToDelete.length) return;
+
+      event.preventDefault();
+      const deletedIds = new Set(idsToDelete);
+      setAnnotations((current) => current.filter((annotation) => !deletedIds.has(annotation.id)));
+      setSelectedId(null);
+      setGroupSelection([]);
+      setSaveState("idle");
+      setSaveError("");
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [groupSelection, pageAnnotations.length, selectedId, tool]);
+
   function loadPdfFile(file: File | null) {
     if (!file) return;
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -565,12 +610,13 @@ export function AdminFormWorkspace({
                   <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
                 </label>
               )}
-              <button className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move" onClick={() => setTool("select")}>
+              <button className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move (V)" aria-keyshortcuts="V" onClick={() => setTool("select")}>
                 <MousePointer2 size={15} />
               </button>
               <button
                 className={`tool-button ${tool === "transform-all" ? "active" : ""}`}
-                title="Select multiple annotations to move or scale together"
+                title="Select multiple annotations to move or scale together (B)"
+                aria-keyshortcuts="B"
                 onClick={() => {
                   setTool("transform-all");
                   setSelectedId(null);
@@ -925,7 +971,13 @@ export function AdminFormWorkspace({
                     />
                   </div>
                 )}
-                <button className="button button-danger admin-approve-button" type="button" onClick={deleteSelectedAnnotation}>
+                <button
+                  className="button button-danger admin-approve-button"
+                  type="button"
+                  onClick={deleteSelectedAnnotation}
+                  title="Delete annotation (Delete)"
+                  aria-keyshortcuts="Backspace Delete"
+                >
                   <Trash2 size={16} />
                   Delete annotation
                 </button>
