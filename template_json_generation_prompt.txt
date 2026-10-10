@@ -1,0 +1,143 @@
+You will receive a blank Sri Lankan government form, primarily in Sinhala, sometimes containing Tamil and English.
+
+Your task is to identify all printed elements and empty answer regions, extract their text, identify their bounding boxes, and return a structured Annotations JSON (v1.1).
+
+1. Annotation classes
+
+Use only these 12 classes:
+
+```json
+[
+  "Printed text",
+  "Handwritten text",
+  "Table",
+  "Title",
+  "Section-header",
+  "Logo",
+  "Page-header",
+  "Page-footer",
+  "List-item",
+  "Footnote",
+  "Signature",
+  "Stamp"
+]
+```
+
+- Printed text: Questions, field labels, instructions, and other fixed text.
+- Handwritten text: All user-input regions, including blank lines, empty boxes, checkboxes, and table answer cells.
+- Table: The entire table boundary. Annotate its individual questions and answer cells separately.
+- Signature / Stamp: Separate non-text regions. Do not add an additional Handwritten text annotation for them.
+
+2. Bounding boxes
+
+- Use normalized coordinates from 0 to 1000.
+- Origin: top-left.
+- Format: `[x1, y1, x2, y2]`.
+- Identify bounding boxes accurately for every region.
+- Page numbering starts at 1.
+- x increases from left to right
+- y increases from top to bottom
+
+3. Question–answer linking
+
+- Every answer must be linked to its corresponding question using the same `questionId`.
+- Each answer must have a unique `fieldKey` and `placeholder: true`.
+- For questions with multiple answers, reuse the `questionId` but assign different `fieldKey` values.
+- Preserve the original reading order.
+
+Empty answer fields: Even though the form is blank, annotate every fillable region as `"Handwritten text"` with `"text": "{{fieldKey}}"`. Do not omit empty fields or invent answers.
+
+4. Multilingual questions
+
+- Preserve Sinhala, Tamil, and English text in their original scripts.
+- If multiple languages express the same question, annotate each printed text region separately but assign them the same `questionId`.
+- Link all language versions to the same answer field.
+- Do not create duplicate answer fields merely because a question is multilingual.
+- Do not translate or replace the original printed text.
+- State the language in the respective prop ('si', 'ta', 'en')
+
+ 5. Tables and special fields
+
+- Annotate the whole table as `"Table"`.
+- Annotate questions and column headers inside tables as `"Printed text"`.
+- Annotate blank answer cells as `"Handwritten text"`.
+- Use `groupId`, `parentId`, `rowIndex`, and `columnKey` to preserve table relationships.
+- For split dates, use `renderMode: "date-part"` and `datePart: "year" | "month" | "day"`.
+- For checkboxes, use `renderMode: "checkbox-choice"` and include each option's value and bounding box.
+- Mark uncertain OCR with `reviewRequired: true`. Include `ocrConfidence` only when measured.
+
+6. Required JSON format
+
+```json
+{
+  "metadata": {
+    "schemaVersion": "1.1",
+    "id": "sample-form",
+    "name": "Sample Application Form",
+    "source": "sample.pdf",
+    "pages": 1,
+    "coordinateSystem": {
+      "type": "normalized",
+      "range": [0, 1000],
+      "origin": "top-left",
+      "bboxFormat": "[x1, y1, x2, y2]"
+    },
+    "sourceRender": {
+      "page1PixelsAt300Dpi": [2480, 3509]
+    },
+    "importantNote": ""
+  },
+  "annotations": [
+    {
+      "id": "p1-r001",
+      "page": 1,
+      "readingOrder": 1,
+      "label": "Printed text",
+      "text": "සම්පූර්ණ නම:",
+      "bbox": [100, 150, 350, 190],
+      "questionId": "q001"
+    },
+    {
+      "id": "p1-r002",
+      "page": 1,
+      "readingOrder": 2,
+      "label": "Printed text",
+      "text": "Full Name:",
+      "bbox": [100, 195, 350, 235],
+      "questionId": "q001"
+    },
+    {
+      "id": "p1-r003",
+      "page": 1,
+      "readingOrder": 3,
+      "label": "Handwritten text",
+      "text": "{{fullName}}",
+      "bbox": [360, 150, 900, 235],
+      "questionId": "q001",
+      "fieldKey": "fullName",
+      "placeholder": true
+    }
+  ]
+}
+```
+
+7. Annotation properties
+
+Required: `id`, `page`, `readingOrder`, `label`, `text`, `bbox`.
+
+Required where applicable: `questionId`, `language`, `fieldKey`, `placeholder`.
+
+Optional: `groupId`, `parentId`, `rowIndex`, `columnKey`, `choices`, `notes`, `ocrConfidence`, `reviewRequired`.
+
+8. Output requirements
+
+Return only valid JSON, matching the structure above.
+
+Ensure:
+- All printed text and blank answer regions are included.
+- Every answer is linked to a question.
+- Multilingual versions of the same question share one `questionId`.
+- Tables preserve their structure and cell relationships.
+- Signatures and stamps are separate regions.
+- All bounding boxes are within `[0, 1000]`.
+- No fabricated answers or OCR text are added.
