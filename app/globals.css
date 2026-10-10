@@ -346,6 +346,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .annotation-answer { fill: rgba(230,166,71,.13); stroke: #d08b27; stroke-width: 2; stroke-dasharray: 7 4; vector-effect: non-scaling-stroke; }
 .annotation-selected { stroke: #123b2e; stroke-width: 3; }
 .draw-preview { fill: rgba(35,102,79,.1); stroke: #23664f; stroke-width: 2; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.selection-preview { fill: rgba(37,99,235,.10); stroke: #2563eb; stroke-width: 1.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; }
 .resize-handle { fill: white; stroke: #123b2e; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .stage-loading { width: 600px; height: 760px; display: grid; place-items: center; color: var(--muted); }
 .admin-form-badge {

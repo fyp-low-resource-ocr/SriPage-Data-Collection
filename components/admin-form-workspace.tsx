@@ -15,6 +15,7 @@ import {
 import { applyLlmValues, buildLlmValueRequest, parseLlmValues } from "@/features/public-data-collection/forms/annotation-llm-values";
 import type { DataCollectionForm } from "@/features/public-data-collection/forms/types";
 import { embedAnnotationValuesInPdf, isFilledAnswer } from "@/lib/client/embed-annotation-values";
+import { getIntersectingAnnotationIds } from "@/lib/annotation-selection";
 import type { SavedGeneratedFormDetails } from "@/features/public-data-collection/server/firebase/generated-form-details-repository";
 import { PdfPageCanvas, PdfThumbnails, usePdfDocument } from "./pdf-viewer";
 
@@ -113,6 +114,9 @@ export function AdminFormWorkspace({
   const [groupSelection, setGroupSelection] = useState<string[]>([]);
   const [drawStart, setDrawStart] = useState<Point | null>(null);
   const [drawCurrent, setDrawCurrent] = useState<Point | null>(null);
+  const [selectionStart, setSelectionStart] = useState<Point | null>(null);
+  const [selectionCurrent, setSelectionCurrent] = useState<Point | null>(null);
+  const selectionBaseRef = useRef<string[]>([]);
   const interactionRef = useRef<{
     type: "move" | "resize" | "move-all" | "resize-all";
     annotationId?: string;
@@ -223,6 +227,15 @@ export function AdminFormWorkspace({
   }
 
   function pointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (selectionStart) {
+      const point = pointFromEvent(event);
+      setSelectionCurrent(point);
+      const selection = bboxFromPoints(selectionStart, point);
+      const intersectingIds = getIntersectingAnnotationIds(pageAnnotations, selection);
+      setGroupSelection(Array.from(new Set([...selectionBaseRef.current, ...intersectingIds])));
+      return;
+    }
+
     if (drawStart) {
       setDrawCurrent(pointFromEvent(event));
       return;
@@ -255,14 +268,28 @@ export function AdminFormWorkspace({
   }
 
   function pointerDown(event: React.PointerEvent<SVGSVGElement>) {
-    if (tool !== "draw") return;
     const point = pointFromEvent(event);
-    setDrawStart(point);
-    setDrawCurrent(point);
+    if (tool === "transform-all") {
+      selectionBaseRef.current = event.shiftKey ? groupSelection : [];
+      setSelectionStart(point);
+      setSelectionCurrent(point);
+      if (!event.shiftKey) setGroupSelection([]);
+    } else if (tool === "draw") {
+      setDrawStart(point);
+      setDrawCurrent(point);
+    } else {
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function pointerUp() {
+    if (selectionStart) {
+      setSelectionStart(null);
+      setSelectionCurrent(null);
+      selectionBaseRef.current = [];
+    }
+
     if (drawStart && drawCurrent) {
       const bbox = bboxFromPoints(drawStart, drawCurrent);
       if (bbox[2] - bbox[0] > 4 && bbox[3] - bbox[1] > 4) {
@@ -284,6 +311,10 @@ export function AdminFormWorkspace({
 
     interactionRef.current = null;
   }
+
+  const selectionBox = selectionStart && selectionCurrent
+    ? normalizeSriPageBBox(bboxFromPoints(selectionStart, selectionCurrent))
+    : null;
 
   function deleteSelectedAnnotation() {
     if (!selected) return;
@@ -626,7 +657,7 @@ export function AdminFormWorkspace({
                     onPointerMove={pointerMove}
                     onPointerUp={pointerUp}
                     onPointerCancel={pointerUp}
-                    style={{ cursor: tool === "draw" ? "crosshair" : "default" }}
+                    style={{ cursor: tool === "draw" || tool === "transform-all" ? "crosshair" : "default" }}
                   >
                     {pageAnnotations.map((annotation) => {
                       const box = normalizeSriPageBBox(annotation.bbox);
@@ -682,6 +713,16 @@ export function AdminFormWorkspace({
                         </g>
                       );
                     })()}
+                    {tool === "transform-all" && selectionBox && (
+                      <rect
+                        x={selectionBox.x * pageSize.width}
+                        y={selectionBox.y * pageSize.height}
+                        width={selectionBox.width * pageSize.width}
+                        height={selectionBox.height * pageSize.height}
+                        className="selection-preview"
+                        pointerEvents="none"
+                      />
+                    )}
                     {drawBox && (
                       <rect
                         x={drawBox.x * pageSize.width}
@@ -706,7 +747,7 @@ export function AdminFormWorkspace({
 
           {tool === "transform-all" && (
             <div className="instruction">
-              Click boxes to add or remove them. Drag the center handle to move the selection, or the lower-right handle to scale it. Hold Shift while scaling to preserve the original aspect ratio.
+              Drag across the page to select multiple boxes, or click boxes to add or remove them. Shift-drag adds to the current selection. Drag the center handle to move the selection, or the lower-right handle to scale it. Hold Shift while scaling to preserve the original aspect ratio.
             </div>
           )}
 

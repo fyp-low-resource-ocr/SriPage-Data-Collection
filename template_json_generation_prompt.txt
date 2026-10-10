@@ -55,6 +55,7 @@ Empty answer fields: Even though the form is blank, annotate every fillable regi
 - Do not create duplicate answer fields merely because a question is multilingual.
 - Do not translate or replace the original printed text.
 - State the language in the respective prop ('si', 'ta', 'en')
+- If multiple answer spaces are provided for the same question in different languages (Sinhala, Tamil, and English), annotate only the Sinhala answer space with a Handwritten text bounding box.
 
  5. Tables and special fields
 
