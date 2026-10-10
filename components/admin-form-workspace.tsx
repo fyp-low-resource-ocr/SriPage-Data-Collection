@@ -227,7 +227,7 @@ export function AdminFormWorkspace({
     if (interaction.annotations && interaction.bounds) {
       const transformed = interaction.type === "move-all"
         ? moveAnnotations(interaction.annotations, interaction.bounds, dx, dy)
-        : scaleAnnotations(interaction.annotations, interaction.bounds, point);
+        : scaleAnnotations(interaction.annotations, interaction.bounds, point, event.shiftKey);
       const transformedById = new Map(transformed.map((annotation) => [annotation.id, annotation]));
       setAnnotations((current) => current.map((annotation) => transformedById.get(annotation.id) ?? annotation));
       setSaveState("idle");
@@ -590,7 +590,7 @@ export function AdminFormWorkspace({
 
           {tool === "transform-all" && (
             <div className="instruction">
-              Click boxes to add or remove them. Drag the center handle to move the selection, or the lower-right handle to scale it.
+              Click boxes to add or remove them. Drag the center handle to move the selection, or the lower-right handle to scale it. Hold Shift while scaling to preserve the original aspect ratio.
             </div>
           )}
 
@@ -782,21 +782,49 @@ function moveAnnotations(annotations: AdminAnnotation[], [x1, y1, x2, y2]: Bound
   }));
 }
 
-function scaleAnnotations(annotations: AdminAnnotation[], [x1, y1, x2, y2]: Bounds, point: Point) {
+function scaleAnnotations(
+  annotations: AdminAnnotation[],
+  [x1, y1, x2, y2]: Bounds,
+  point: Point,
+  preserveAspectRatio = false,
+) {
   const width = x2 - x1;
   const height = y2 - y1;
   const cursorX = point.x * 1000;
   const cursorY = point.y * 1000;
-  const projectedScale = ((cursorX - x1) * width + (cursorY - y1) * height) / (width ** 2 + height ** 2);
-  const smallestDimension = Math.min(...annotations.flatMap(({ bbox }) => [bbox[2] - bbox[0], bbox[3] - bbox[1]]));
-  const minimumScale = Math.max(0.05, 1 / smallestDimension);
-  const maximumScale = Math.min((1000 - x1) / width, (1000 - y1) / height);
-  const scale = clamp(projectedScale, minimumScale, maximumScale);
+  const smallestWidth = Math.min(...annotations.map(({ bbox }) => bbox[2] - bbox[0]));
+  const smallestHeight = Math.min(...annotations.map(({ bbox }) => bbox[3] - bbox[1]));
+  const minimumScaleX = Math.max(0.05, 1 / smallestWidth);
+  const minimumScaleY = Math.max(0.05, 1 / smallestHeight);
+  const maximumScaleX = (1000 - x1) / width;
+  const maximumScaleY = (1000 - y1) / height;
+  let scaleX = clamp(
+    (cursorX - x1) / width,
+    minimumScaleX,
+    maximumScaleX,
+  );
+  let scaleY = clamp(
+    (cursorY - y1) / height,
+    minimumScaleY,
+    maximumScaleY,
+  );
+
+  if (preserveAspectRatio) {
+    const projectedScale = ((cursorX - x1) * width + (cursorY - y1) * height) / (width ** 2 + height ** 2);
+    const scale = clamp(
+      projectedScale,
+      Math.max(minimumScaleX, minimumScaleY),
+      Math.min(maximumScaleX, maximumScaleY),
+    );
+    scaleX = scale;
+    scaleY = scale;
+  }
 
   return annotations.map((annotation) => ({
     ...annotation,
     bbox: annotation.bbox.map((coordinate, index) => {
       const origin = index % 2 === 0 ? x1 : y1;
+      const scale = index % 2 === 0 ? scaleX : scaleY;
       return Math.round(origin + (coordinate - origin) * scale);
     }) as AdminAnnotation["bbox"],
   }));
