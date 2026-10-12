@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowRight, BadgeCheck, Database, FileJson, FileText, Search, UploadCloud } from "lucide-react";
 import { annotationDocumentSchema, type AnnotationDocument } from "@/features/public-data-collection/forms/annotation-types";
 import type { DataCollectionForm } from "@/features/public-data-collection/forms/types";
@@ -123,6 +124,10 @@ export function AdminDashboardClient({
             <h1>Manage form annotation templates.</h1>
             <p>Upload an empty PDF with annotation JSON to correct the reusable template, or review a saved filled document by unique form name.</p>
           </div>
+          <Link className="button button-primary admin-annotate-launch" href="/admin/annotate">
+            <FileJson size={16} />
+            Open annotation tool
+          </Link>
         </section>
 
         <section className="admin-dashboard-grid">

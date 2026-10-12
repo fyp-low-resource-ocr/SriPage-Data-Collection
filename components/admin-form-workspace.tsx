@@ -29,6 +29,7 @@ type ResizeHandle = ResizeCorner | ResizeEdge;
 type TemplateDraft = {
   formId: string;
   formName: string;
+  standalone?: boolean;
   pdfFile?: File;
   pdfUrl?: string;
   pdfName: string;
@@ -87,6 +88,7 @@ export function AdminFormWorkspace({
   formDefinition?: DataCollectionForm;
 }) {
   const isTemplateMode = Boolean(templateDraft);
+  const canSaveTemplate = isTemplateMode && !templateDraft?.standalone;
   const initialAnnotationsJson = templateDraft?.annotationsJson ?? savedForm?.annotationsJson ?? null;
   const storedAnnotations = initialAnnotationsJson?.annotations;
   const [annotations, setAnnotations] = useState<AdminAnnotation[]>(() => storedAnnotations ?? []);
@@ -96,6 +98,12 @@ export function AdminFormWorkspace({
     name: templateDraft?.formName ?? "Template",
     source: "",
   });
+  const activeFormDefinition = useMemo(
+    () => formDefinition ?? (templateDraft?.standalone
+      ? createStandaloneFormDefinition(templateMetadata, annotations)
+      : undefined),
+    [annotations, formDefinition, templateDraft?.standalone, templateMetadata],
+  );
   const [templateJsonText, setTemplateJsonText] = useState("");
   const [llmValuesText, setLlmValuesText] = useState("");
   const [llmCopyState, setLlmCopyState] = useState<"idle" | "copied">("idle");
@@ -491,8 +499,8 @@ export function AdminFormWorkspace({
   }
 
   function getLlmRequestJson() {
-    if (!formDefinition) return "";
-    return `${JSON.stringify(buildLlmValueRequest(formDefinition, annotations), null, 2)}\n`;
+    if (!activeFormDefinition) return "";
+    return `${JSON.stringify(buildLlmValueRequest(activeFormDefinition, annotations), null, 2)}\n`;
   }
 
   async function copyLlmInput() {
@@ -507,17 +515,17 @@ export function AdminFormWorkspace({
   }
 
   function downloadLlmInput() {
-    if (!formDefinition) return;
+    if (!activeFormDefinition) return;
     const blobUrl = URL.createObjectURL(new Blob([getLlmRequestJson()], { type: "application/json" }));
     const link = window.document.createElement("a");
     link.href = blobUrl;
-    link.download = `${formDefinition.id}-llm-input.json`;
+    link.download = `${activeFormDefinition.id}-llm-input.json`;
     link.click();
     URL.revokeObjectURL(blobUrl);
   }
 
   function loadLlmValues() {
-    if (!formDefinition || !llmValuesText.trim()) return;
+    if (!activeFormDefinition || !llmValuesText.trim()) return;
     try {
       const matchingKeys = new Set(annotations.flatMap((annotation) => (
         annotation.label === "Handwritten text" && annotation.fieldKey ? [annotation.fieldKey] : []
@@ -542,13 +550,13 @@ export function AdminFormWorkspace({
     console.log("Preconditions", {
       hasPdfDocument: Boolean(document),
       pdfPages: document?.numPages ?? 0,
-      hasFormDefinition: Boolean(formDefinition),
+      hasFormDefinition: Boolean(activeFormDefinition),
       pdfName,
       includeExportIndex: includePdfExportIndex,
       exportIndex: pdfExportIndex,
       annotationCount: annotations.length,
     });
-    if (!document || !formDefinition) {
+    if (!document || !activeFormDefinition) {
       console.warn("[filled-pdf-export] Export stopped because the PDF document or form definition is missing.");
       console.groupEnd();
       return;
@@ -580,7 +588,7 @@ export function AdminFormWorkspace({
             metadata: templateMetadata,
             annotations: annotations.map(cleanAnnotationForSave),
           };
-      const exportBaseName = `${getFileBaseName(pdfName || formDefinition.id)}${includePdfExportIndex ? `_${pdfExportIndex}` : ""}`;
+      const exportBaseName = `${getFileBaseName(pdfName || activeFormDefinition.id)}${includePdfExportIndex ? `_${pdfExportIndex}` : ""}`;
       const jsonBlob = new Blob([`${JSON.stringify(currentTemplate, null, 2)}\n`], { type: "application/json" });
       console.log("Prepared downloads", {
         pdf: { filename: `${exportBaseName}.pdf`, size: blob.size },
@@ -604,7 +612,7 @@ export function AdminFormWorkspace({
   }
 
   const drawBox = drawStart && drawCurrent ? normalizeSriPageBBox(bboxFromPoints(drawStart, drawCurrent)) : null;
-  const workspaceTitle = templateDraft?.formName ?? savedForm?.uniqueFormName ?? "Annotation editor";
+  const workspaceTitle = templateDraft?.standalone ? "Annotation editor" : templateDraft?.formName ?? savedForm?.uniqueFormName ?? "Annotation editor";
   const uploadPrompt = isTemplateMode ? "Upload empty PDF for template review" : "Upload filled PDF for review";
   const emptyStateTitle = isTemplateMode ? "No PDF loaded" : "Upload the filled PDF for this review";
   const emptyStateCopy = isTemplateMode
@@ -616,8 +624,8 @@ export function AdminFormWorkspace({
   const saveSuccessMessage = isTemplateMode
     ? "Template annotations saved to formAnnotationTemplates."
     : "Annotation JSON saved and status changed to approved.";
-  const pdfExportBaseName = formDefinition
-    ? `${getFileBaseName(pdfName || formDefinition.id)}${includePdfExportIndex ? `_${pdfExportIndex}` : ""}`
+  const pdfExportBaseName = activeFormDefinition
+    ? `${getFileBaseName(pdfName || activeFormDefinition.id)}${includePdfExportIndex ? `_${pdfExportIndex}` : ""}`
     : "";
 
   return (
@@ -955,10 +963,12 @@ export function AdminFormWorkspace({
           <div className="panel-section">
             <h3>Review actions</h3>
             <div className="form-grid">
-              <button className="button button-primary admin-approve-button" type="button" onClick={isTemplateMode ? saveTemplate : approveAnnotations} disabled={saveState === "saving"}>
-                {saveState === "saving" ? <span className="spinner" /> : saveState === "saved" ? <Check size={16} /> : <Save size={16} />}
-                {saveButtonLabel}
-              </button>
+              {(canSaveTemplate || !isTemplateMode) && (
+                <button className="button button-primary admin-approve-button" type="button" onClick={isTemplateMode ? saveTemplate : approveAnnotations} disabled={saveState === "saving"}>
+                  {saveState === "saving" ? <span className="spinner" /> : saveState === "saved" ? <Check size={16} /> : <Save size={16} />}
+                  {saveButtonLabel}
+                </button>
+              )}
               {isTemplateMode && (
                 <button className="button button-secondary admin-approve-button" type="button" onClick={exportTemplate}>
                   <Download size={16} />
@@ -969,7 +979,7 @@ export function AdminFormWorkspace({
             </div>
           </div>
 
-          {formDefinition && (
+          {activeFormDefinition && (
             <div className="panel-section">
               <h3>LLM sample values</h3>
               <div className="form-grid">
@@ -1287,6 +1297,33 @@ function cleanAnnotationForSave(annotation: AdminAnnotation): AdminAnnotation {
   };
 }
 
+function createStandaloneFormDefinition(
+  metadata: AnnotationMetadata,
+  annotations: AdminAnnotation[],
+): DataCollectionForm {
+  const fieldKeys = [...new Set(annotations.flatMap((annotation) => (
+    annotation.label === "Handwritten text" && annotation.fieldKey ? [annotation.fieldKey] : []
+  )))];
+
+  return {
+    id: metadata.id,
+    nameSi: metadata.name,
+    nameEn: metadata.name,
+    documentPath: metadata.source,
+    category: {
+      id: "standalone",
+      nameSi: "Standalone",
+      nameEn: "Standalone",
+    },
+    fields: fieldKeys.map((key) => ({
+      key,
+      labelSi: key,
+      labelEn: key,
+      type: "text",
+    })),
+  };
+}
+
 function getCurrentTemplateDocument(
   templateDraft: TemplateDraft,
   metadata: AnnotationMetadata,
@@ -1297,8 +1334,8 @@ function getCurrentTemplateDocument(
   return {
     metadata: {
       ...metadata,
-      id: templateDraft.formId,
-      name: templateDraft.formName,
+      id: templateDraft.standalone ? metadata.id : templateDraft.formId,
+      name: templateDraft.standalone ? metadata.name : templateDraft.formName,
       source: templateDraft.annotationsJson.metadata.source || pdfName,
       ...(pageCount ? { pages: pageCount } : {}),
     },
