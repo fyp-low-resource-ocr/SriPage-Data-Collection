@@ -284,7 +284,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .error { color: var(--red); background: #fff3f3; border: 1px solid #f2cece; padding: 10px 12px; border-radius: 9px; font-size: 12px; }
 
 .workspace { min-height: 100vh; background: #edf0ec; }
-.workspace-bar { height: 68px; padding: 0 22px; display: flex; align-items: center; gap: 16px; background: var(--forest); color: white; }
+.workspace-bar { position: sticky; top: 0; z-index: 100; height: 68px; padding: 0 22px; display: flex; align-items: center; gap: 16px; background: var(--forest); color: white; }
 .workspace-title { min-width: 0; }
 .workspace-title strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .workspace-title span { font-size: 11px; opacity: .62; }
@@ -294,7 +294,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .save-state { font-size: 11px; color: rgba(255,255,255,.66); min-width: 52px; text-align: right; }
 
 .editor-grid { display: grid; grid-template-columns: 220px minmax(460px, 1fr) 320px; height: calc(100vh - 68px); }
-.side-panel { background: white; border-right: 1px solid var(--line); overflow: auto; }
+.side-panel { position: sticky; top: 68px; align-self: start; height: calc(100vh - 68px); background: white; border-right: 1px solid var(--line); overflow: auto; }
 .side-panel.right { border-right: 0; border-left: 1px solid var(--line); }
 .panel-head { padding: 18px; border-bottom: 1px solid var(--line); }
 .panel-head h2 { font-size: 13px; margin: 0 0 4px; }
@@ -308,7 +308,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .thumb span { display: block; text-align: center; font-size: 10px; margin-top: 5px; color: var(--muted); }
 
 .canvas-column { min-width: 0; display: flex; flex-direction: column; background: #dfe3de; }
-.canvas-toolbar { height: 52px; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; background: #f9faf8; border-bottom: 1px solid var(--line); }
+.canvas-toolbar { position: sticky; top: 68px; z-index: 50; height: 52px; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; background: #f9faf8; border-bottom: 1px solid var(--line); }
 .tool-group { display: flex; align-items: center; gap: 5px; }
 .tool-button { height: 32px; min-width: 32px; padding: 0 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; font-size: 11px; }
 .tool-button:hover { background: #eef1ed; }
@@ -791,8 +791,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .workspace-nav { order: 3; width: 100%; }
   .workspace-nav button { flex: 1; }
   .editor-grid { height: auto; min-height: calc(100vh - 112px); grid-template-columns: 1fr; }
-  .side-panel { max-height: 220px; }
+  .side-panel { position: static; height: auto; max-height: 220px; }
   .side-panel.right { max-height: none; }
+  .canvas-toolbar { position: static; }
   .canvas-column { min-height: 620px; }
   .generate-wrap, .settings-wrap { height: auto; padding: 16px; }
   .font-grid { grid-template-columns: 1fr; }

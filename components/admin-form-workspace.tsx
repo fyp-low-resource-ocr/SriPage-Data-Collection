@@ -174,6 +174,40 @@ export function AdminFormWorkspace({
         return;
       }
 
+      const arrowDirection: Partial<Record<string, Point>> = {
+        arrowleft: { x: -1, y: 0 },
+        arrowright: { x: 1, y: 0 },
+        arrowup: { x: 0, y: -1 },
+        arrowdown: { x: 0, y: 1 },
+      };
+      const direction = arrowDirection[key];
+      if (direction) {
+        const idsToMove = tool === "transform-all"
+          ? groupSelection
+          : selectedId ? [selectedId] : [];
+        if (!idsToMove.length) return;
+
+        event.preventDefault();
+        const distance = event.shiftKey ? 10 : 1;
+        const movingIds = new Set(idsToMove);
+        setAnnotations((current) => {
+          const movingAnnotations = current.filter((annotation) => movingIds.has(annotation.id));
+          const bounds = getGroupBounds(movingAnnotations);
+          if (!bounds) return current;
+          const moved = moveAnnotations(
+            movingAnnotations,
+            bounds,
+            direction.x * distance,
+            direction.y * distance,
+          );
+          const movedById = new Map(moved.map((annotation) => [annotation.id, annotation]));
+          return current.map((annotation) => movedById.get(annotation.id) ?? annotation);
+        });
+        setSaveState("idle");
+        setSaveError("");
+        return;
+      }
+
       if (key !== "backspace" && key !== "delete") return;
       const idsToDelete = tool === "transform-all"
         ? groupSelection
@@ -610,7 +644,7 @@ export function AdminFormWorkspace({
                   <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
                 </label>
               )}
-              <button className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move (V)" aria-keyshortcuts="V" onClick={() => setTool("select")}>
+              <button className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move (V); use arrow keys to nudge" aria-keyshortcuts="V ArrowLeft ArrowRight ArrowUp ArrowDown" onClick={() => setTool("select")}>
                 <MousePointer2 size={15} />
               </button>
               <button
