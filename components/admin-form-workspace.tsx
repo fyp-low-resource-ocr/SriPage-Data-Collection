@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BoxSelect, Check, Copy, Download, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, BoxSelect, Check, Copy, Download, Eye, EyeOff, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
@@ -23,6 +23,9 @@ type AdminAnnotation = SriPageAnnotation;
 type Point = { x: number; y: number };
 type Tool = "select" | "draw" | "transform-all";
 type Bounds = [number, number, number, number];
+type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+type ResizeEdge = "top" | "right" | "bottom" | "left";
+type ResizeHandle = ResizeCorner | ResizeEdge;
 type TemplateDraft = {
   formId: string;
   formName: string;
@@ -99,6 +102,7 @@ export function AdminFormWorkspace({
   const [llmApplyNote, setLlmApplyNote] = useState("");
   const [pdfExportState, setPdfExportState] = useState<"idle" | "exporting">("idle");
   const [pdfExportNote, setPdfExportNote] = useState("");
+  const [includePdfExportIndex, setIncludePdfExportIndex] = useState(false);
   const [pdfExportIndex, setPdfExportIndex] = useState(1);
   const [status, setStatus] = useState(savedForm?.status ?? "template");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -110,6 +114,8 @@ export function AdminFormWorkspace({
   const [zoom, setZoom] = useState(1);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [tool, setTool] = useState<Tool>("select");
+  const [showBoxLabels, setShowBoxLabels] = useState(true);
+  const [showAnnotationText, setShowAnnotationText] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(annotations[0]?.id ?? null);
   const [groupSelection, setGroupSelection] = useState<string[]>([]);
   const [drawStart, setDrawStart] = useState<Point | null>(null);
@@ -124,6 +130,7 @@ export function AdminFormWorkspace({
     bbox?: AdminAnnotation["bbox"];
     annotations?: AdminAnnotation[];
     bounds?: Bounds;
+    resizeHandle?: ResizeHandle;
   } | null>(null);
   const setSize = useCallback((size: { width: number; height: number }) => setPageSize(size), []);
 
@@ -293,7 +300,11 @@ export function AdminFormWorkspace({
     };
   }
 
-  function startGroupTransform(event: React.PointerEvent<SVGRectElement | SVGCircleElement>, type: "move-all" | "resize-all") {
+  function startGroupTransform(
+    event: React.PointerEvent<SVGRectElement | SVGCircleElement>,
+    type: "move-all" | "resize-all",
+    resizeHandle?: ResizeHandle,
+  ) {
     event.stopPropagation();
     if (tool !== "transform-all" || !groupBounds) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -302,6 +313,7 @@ export function AdminFormWorkspace({
       start: pointFromEvent(event),
       annotations: groupAnnotations,
       bounds: groupBounds,
+      resizeHandle,
     };
   }
 
@@ -330,7 +342,13 @@ export function AdminFormWorkspace({
     if (interaction.annotations && interaction.bounds) {
       const transformed = interaction.type === "move-all"
         ? moveAnnotations(interaction.annotations, interaction.bounds, dx, dy)
-        : scaleAnnotations(interaction.annotations, interaction.bounds, point, event.shiftKey);
+        : scaleAnnotations(
+            interaction.annotations,
+            interaction.bounds,
+            point,
+            interaction.resizeHandle ?? "bottom-right",
+            event.shiftKey,
+          );
       const transformedById = new Map(transformed.map((annotation) => [annotation.id, annotation]));
       setAnnotations((current) => current.map((annotation) => transformedById.get(annotation.id) ?? annotation));
       setSaveState("idle");
@@ -526,6 +544,7 @@ export function AdminFormWorkspace({
       pdfPages: document?.numPages ?? 0,
       hasFormDefinition: Boolean(formDefinition),
       pdfName,
+      includeExportIndex: includePdfExportIndex,
       exportIndex: pdfExportIndex,
       annotationCount: annotations.length,
     });
@@ -561,7 +580,7 @@ export function AdminFormWorkspace({
             metadata: templateMetadata,
             annotations: annotations.map(cleanAnnotationForSave),
           };
-      const exportBaseName = `${getFileBaseName(pdfName || formDefinition.id)}_${pdfExportIndex}`;
+      const exportBaseName = `${getFileBaseName(pdfName || formDefinition.id)}${includePdfExportIndex ? `_${pdfExportIndex}` : ""}`;
       const jsonBlob = new Blob([`${JSON.stringify(currentTemplate, null, 2)}\n`], { type: "application/json" });
       console.log("Prepared downloads", {
         pdf: { filename: `${exportBaseName}.pdf`, size: blob.size },
@@ -570,7 +589,9 @@ export function AdminFormWorkspace({
       downloadBlob(blob, `${exportBaseName}.pdf`);
       downloadBlob(jsonBlob, `${exportBaseName}.json`);
       setPdfExportNote(`Downloaded ${exportBaseName}.pdf and ${exportBaseName}.json with ${filledAnswerCount} embedded value${filledAnswerCount === 1 ? "" : "s"}.`);
-      setPdfExportIndex((current) => current + 1);
+      if (includePdfExportIndex) {
+        setPdfExportIndex((current) => current + 1);
+      }
       console.log("[filled-pdf-export] Both download clicks were dispatched.");
     } catch (reason) {
       console.error("[filled-pdf-export] Export failed", reason);
@@ -595,6 +616,9 @@ export function AdminFormWorkspace({
   const saveSuccessMessage = isTemplateMode
     ? "Template annotations saved to formAnnotationTemplates."
     : "Annotation JSON saved and status changed to approved.";
+  const pdfExportBaseName = formDefinition
+    ? `${getFileBaseName(pdfName || formDefinition.id)}${includePdfExportIndex ? `_${pdfExportIndex}` : ""}`
+    : "";
 
   return (
     <div className="workspace">
@@ -684,6 +708,26 @@ export function AdminFormWorkspace({
               <button className={`tool-button ${tool === "draw" ? "active" : ""}`} title="Draw annotation" onClick={() => setTool("draw")}>
                 <Plus size={16} />
               </button>
+              <button
+                type="button"
+                className={`tool-button ${showBoxLabels ? "active" : ""}`}
+                title={`${showBoxLabels ? "Hide" : "Show"} annotation labels`}
+                aria-label={`${showBoxLabels ? "Hide" : "Show"} annotation labels`}
+                aria-pressed={showBoxLabels}
+                onClick={() => setShowBoxLabels((current) => !current)}
+              >
+                {showBoxLabels ? <Eye size={16} /> : <EyeOff size={16} />}
+              </button>
+              <button
+                type="button"
+                className={`tool-button ${showAnnotationText ? "active" : ""}`}
+                title={`${showAnnotationText ? "Hide" : "Show"} annotated text`}
+                aria-label={`${showAnnotationText ? "Hide" : "Show"} annotated text`}
+                aria-pressed={showAnnotationText}
+                onClick={() => setShowAnnotationText((current) => !current)}
+              >
+                <FileText size={16} />
+              </button>
             </div>
             <div className="tool-group">
               <button
@@ -741,17 +785,69 @@ export function AdminFormWorkspace({
                   >
                     {pageAnnotations.map((annotation) => {
                       const box = normalizeSriPageBBox(annotation.bbox);
+                      const boxX = box.x * pageSize.width;
+                      const boxY = box.y * pageSize.height;
+                      const boxLabel = annotation.label.toLowerCase();
+                      const boxLabelWidth = boxLabel.length * 4.5 + 8;
+                      const annotationText = annotation.text.trim().replace(/\s+/g, " ");
+                      const visibleAnnotationText = annotationText.length > 48
+                        ? `${annotationText.slice(0, 47)}…`
+                        : annotationText;
+                      const annotationTextWidth = Math.min(Math.max(Array.from(visibleAnnotationText).length * 5.5 + 8, 32), 275);
+                      const boxBottom = (box.y + box.height) * pageSize.height;
                       return (
                         <g key={annotation.id}>
                           <rect
-                            x={box.x * pageSize.width}
-                            y={box.y * pageSize.height}
+                            x={boxX}
+                            y={boxY}
                             width={box.width * pageSize.width}
                             height={box.height * pageSize.height}
                             className={`admin-annotation-box ${annotation.id === selectedId || (tool === "transform-all" && groupSelection.includes(annotation.id)) ? "active" : ""} ${selected?.questionId && annotation.questionId === selected.questionId && annotation.id !== selected.id ? "linked" : ""}`}
                             style={annotationColorStyle(annotation.label)}
                             onPointerDown={(event) => startMove(event, annotation)}
                           />
+                          {showBoxLabels && (
+                            <>
+                              <rect
+                                x={boxX}
+                                y={boxY - 14}
+                                width={boxLabelWidth}
+                                height={14}
+                                rx={2}
+                                className="admin-annotation-box-label-background"
+                                style={annotationColorStyle(annotation.label)}
+                                pointerEvents="none"
+                              />
+                              <text
+                                x={boxX + 4}
+                                y={boxY - 4}
+                                className="admin-annotation-box-label"
+                                pointerEvents="none"
+                              >
+                                {boxLabel}
+                              </text>
+                            </>
+                          )}
+                          {showAnnotationText && annotationText && (
+                            <g pointerEvents="none">
+                              <title>{annotationText}</title>
+                              <rect
+                                x={boxX}
+                                y={boxBottom + 2}
+                                width={annotationTextWidth}
+                                height={16}
+                                rx={2}
+                                className="admin-annotation-text-background"
+                              />
+                              <text
+                                x={boxX + 4}
+                                y={boxBottom + 13}
+                                className="admin-annotation-text"
+                              >
+                                {visibleAnnotationText}
+                              </text>
+                            </g>
+                          )}
                           {annotation.id === selectedId && tool === "select" && (
                             <circle
                               cx={(box.x + box.width) * pageSize.width}
@@ -783,13 +879,38 @@ export function AdminFormWorkspace({
                             className="admin-group-move-handle"
                             onPointerDown={(event) => startGroupTransform(event, "move-all")}
                           />
-                          <circle
-                            cx={(x2 / 1000) * pageSize.width}
-                            cy={(y2 / 1000) * pageSize.height}
-                            r={7}
-                            className="resize-handle admin-group-resize-handle"
-                            onPointerDown={(event) => startGroupTransform(event, "resize-all")}
-                          />
+                          {([
+                            [x1, y1, "top-left"],
+                            [x2, y1, "top-right"],
+                            [x1, y2, "bottom-left"],
+                            [x2, y2, "bottom-right"],
+                          ] as const).map(([x, y, corner]) => (
+                            <circle
+                              key={corner}
+                              cx={(x / 1000) * pageSize.width}
+                              cy={(y / 1000) * pageSize.height}
+                              r={7}
+                              className={`resize-handle admin-group-resize-handle admin-group-resize-handle-${corner}`}
+                              onPointerDown={(event) => startGroupTransform(event, "resize-all", corner)}
+                            />
+                          ))}
+                          {([
+                            [(x1 + x2) / 2, y1, "top"],
+                            [x2, (y1 + y2) / 2, "right"],
+                            [(x1 + x2) / 2, y2, "bottom"],
+                            [x1, (y1 + y2) / 2, "left"],
+                          ] as const).map(([x, y, edge]) => (
+                            <rect
+                              key={edge}
+                              x={(x / 1000) * pageSize.width - 6}
+                              y={(y / 1000) * pageSize.height - 6}
+                              width={12}
+                              height={12}
+                              rx={2}
+                              className={`resize-handle admin-group-resize-handle admin-group-resize-handle-${edge}`}
+                              onPointerDown={(event) => startGroupTransform(event, "resize-all", edge)}
+                            />
+                          ))}
                         </g>
                       );
                     })()}
@@ -827,7 +948,7 @@ export function AdminFormWorkspace({
 
           {tool === "transform-all" && (
             <div className="instruction">
-              Drag across the page to select multiple boxes, or click boxes to add or remove them. Shift-drag adds to the current selection. Drag the center handle to move the selection, or the lower-right handle to scale it. Hold Shift while scaling to preserve the original aspect ratio.
+              Drag across the page to select multiple boxes, or click boxes to add or remove them. Shift-drag adds to the current selection. Drag the center handle to move the selection, an edge handle to resize one axis, or a corner handle to scale it. Hold Shift while scaling from a corner to preserve the original aspect ratio.
             </div>
           )}
 
@@ -875,7 +996,17 @@ export function AdminFormWorkspace({
                 <small>Only annotations with matching field keys are changed. Empty strings clear optional fields.</small>
                 {llmApplyNote && <div className="admin-save-note">{llmApplyNote}</div>}
                 <div className="field">
-                  <label htmlFor="admin-pdf-export-index">Export index</label>
+                  <div className="admin-export-index-heading">
+                    <label htmlFor="admin-pdf-export-index">Export index</label>
+                    <label className="toggle" aria-label="Include export index in filenames">
+                      <input
+                        type="checkbox"
+                        checked={includePdfExportIndex}
+                        onChange={(event) => setIncludePdfExportIndex(event.target.checked)}
+                      />
+                      <span className="toggle-track" aria-hidden="true" />
+                    </label>
+                  </div>
                   <input
                     id="admin-pdf-export-index"
                     className="input"
@@ -883,10 +1014,11 @@ export function AdminFormWorkspace({
                     min={1}
                     step={1}
                     value={pdfExportIndex}
+                    disabled={!includePdfExportIndex}
                     onChange={(event) => setPdfExportIndex(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
                   />
                   <small>
-                    Files: {getFileBaseName(pdfName || formDefinition.id)}_{pdfExportIndex}.pdf and {getFileBaseName(pdfName || formDefinition.id)}_{pdfExportIndex}.json
+                    Files: {pdfExportBaseName}.pdf and {pdfExportBaseName}.json
                   </small>
                 </div>
                 <button
@@ -1086,31 +1218,44 @@ function scaleAnnotations(
   annotations: AdminAnnotation[],
   [x1, y1, x2, y2]: Bounds,
   point: Point,
+  handle: ResizeHandle,
   preserveAspectRatio = false,
 ) {
   const width = x2 - x1;
   const height = y2 - y1;
   const cursorX = point.x * 1000;
   const cursorY = point.y * 1000;
+  const resizesX = handle === "left" || handle === "right" || handle.includes("left") || handle.includes("right");
+  const resizesY = handle === "top" || handle === "bottom" || handle.includes("top") || handle.includes("bottom");
+  const movesLeft = handle === "left" || handle.includes("left");
+  const movesTop = handle === "top" || handle.includes("top");
+  const anchorX = movesLeft ? x2 : x1;
+  const anchorY = movesTop ? y2 : y1;
+  const handleX = movesLeft ? x1 : x2;
+  const handleY = movesTop ? y1 : y2;
   const smallestWidth = Math.min(...annotations.map(({ bbox }) => bbox[2] - bbox[0]));
   const smallestHeight = Math.min(...annotations.map(({ bbox }) => bbox[3] - bbox[1]));
   const minimumScaleX = Math.max(0.05, 1 / smallestWidth);
   const minimumScaleY = Math.max(0.05, 1 / smallestHeight);
-  const maximumScaleX = (1000 - x1) / width;
-  const maximumScaleY = (1000 - y1) / height;
-  let scaleX = clamp(
-    (cursorX - x1) / width,
+  const maximumScaleX = (movesLeft ? anchorX : 1000 - anchorX) / width;
+  const maximumScaleY = (movesTop ? anchorY : 1000 - anchorY) / height;
+  let scaleX = resizesX ? clamp(
+    (cursorX - anchorX) / (handleX - anchorX),
     minimumScaleX,
     maximumScaleX,
-  );
-  let scaleY = clamp(
-    (cursorY - y1) / height,
+  ) : 1;
+  let scaleY = resizesY ? clamp(
+    (cursorY - anchorY) / (handleY - anchorY),
     minimumScaleY,
     maximumScaleY,
-  );
+  ) : 1;
 
-  if (preserveAspectRatio) {
-    const projectedScale = ((cursorX - x1) * width + (cursorY - y1) * height) / (width ** 2 + height ** 2);
+  if (preserveAspectRatio && resizesX && resizesY) {
+    const handleVectorX = handleX - anchorX;
+    const handleVectorY = handleY - anchorY;
+    const projectedScale = (
+      (cursorX - anchorX) * handleVectorX + (cursorY - anchorY) * handleVectorY
+    ) / (width ** 2 + height ** 2);
     const scale = clamp(
       projectedScale,
       Math.max(minimumScaleX, minimumScaleY),
@@ -1123,7 +1268,7 @@ function scaleAnnotations(
   return annotations.map((annotation) => ({
     ...annotation,
     bbox: annotation.bbox.map((coordinate, index) => {
-      const origin = index % 2 === 0 ? x1 : y1;
+      const origin = index % 2 === 0 ? anchorX : anchorY;
       const scale = index % 2 === 0 ? scaleX : scaleY;
       return Math.round(origin + (coordinate - origin) * scale);
     }) as AdminAnnotation["bbox"],

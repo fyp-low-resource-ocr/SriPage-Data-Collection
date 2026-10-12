@@ -341,7 +341,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .canvas-scroll { flex: 1; overflow: auto; padding: 32px; }
 .page-stage { position: relative; margin: 0 auto; width: max-content; box-shadow: 0 10px 32px rgba(20,35,28,.17); background: white; line-height: 0; user-select: none; }
 .page-stage canvas { display: block; }
-.annotation-layer { position: absolute; inset: 0; touch-action: none; }
+.annotation-layer { position: absolute; inset: 0; overflow: visible; touch-action: none; }
 .annotation-label { fill: rgba(35,102,79,.14); stroke: #23664f; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .annotation-answer { fill: rgba(230,166,71,.13); stroke: #d08b27; stroke-width: 2; stroke-dasharray: 7 4; vector-effect: non-scaling-stroke; }
 .annotation-selected { stroke: #123b2e; stroke-width: 3; }
@@ -375,6 +375,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   stroke-width: 1.6;
 }
 .admin-annotation-box.linked { stroke-width: 1.3; stroke-dasharray: 5 3; }
+.admin-annotation-box-label-background {
+  fill: var(--annotation-stroke, #23664f);
+}
+.admin-annotation-box-label {
+  fill: white;
+  font-family: Inter, sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: normal;
+  user-select: none;
+}
+.admin-annotation-text-background {
+  fill: rgba(18,59,46,.9);
+}
+.admin-annotation-text {
+  fill: white;
+  font-family: "Noto Sans Sinhala", "Iskoola Pota", Inter, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: normal;
+  user-select: none;
+}
 .admin-annotation-group {
   fill: rgba(18,59,46,.035);
   stroke: #123b2e;
@@ -383,7 +405,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   vector-effect: non-scaling-stroke;
 }
 .admin-group-move-handle { fill: #123b2e; stroke: white; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: move; }
-.admin-group-resize-handle { cursor: nwse-resize; }
+.admin-group-resize-handle-top-left,
+.admin-group-resize-handle-bottom-right { cursor: nwse-resize; }
+.admin-group-resize-handle-top-right,
+.admin-group-resize-handle-bottom-left { cursor: nesw-resize; }
+.admin-group-resize-handle-left,
+.admin-group-resize-handle-right { cursor: ew-resize; }
+.admin-group-resize-handle-top,
+.admin-group-resize-handle-bottom { cursor: ns-resize; }
 .admin-selected-text {
   padding: 12px;
   color: var(--ink);
@@ -446,6 +475,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .row > * { flex: 1; }
 .checkbox { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .checkbox input { accent-color: var(--forest); }
+.admin-export-index-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.admin-export-index-heading > label { margin: 0; line-height: 20px; }
+.field .toggle { position: relative; display: inline-flex; width: 34px; height: 20px; flex: 0 0 34px; cursor: pointer; }
+.field .toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.toggle-track { position: relative; display: block; width: 34px; height: 20px; border: 1px solid #f6f9f8; border-radius: 999px; background-color: #7d8982; transition: background-color .15s ease, border-color .15s ease; }
+.toggle-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #d8ebe2; box-shadow: 0 1px 3px rgba(15, 27, 22, .35); transition: transform .15s ease; }
+.toggle input:checked + .toggle-track { background: var(--forest); }
+.toggle input:checked + .toggle-track::after { transform: translateX(14px); }
+.toggle input:focus-visible + .toggle-track { outline: 2px solid var(--forest); outline-offset: 2px; }
 
 .generate-wrap, .settings-wrap { height: calc(100vh - 68px); overflow: auto; padding: 32px; }
 .content-card { width: min(1060px, 100%); margin: 0 auto 18px; background: white; border: 1px solid var(--line); border-radius: 15px; }
