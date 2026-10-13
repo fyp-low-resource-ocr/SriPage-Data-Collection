@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowRight, BadgeCheck, Database, FileJson, FileText, Search, UploadCloud } from "lucide-react";
-import type { AnnotationDocument } from "@/features/public-data-collection/forms/annotation-types";
+import { annotationDocumentSchema, type AnnotationDocument } from "@/features/public-data-collection/forms/annotation-types";
 import type { DataCollectionForm } from "@/features/public-data-collection/forms/types";
 import type { FormAnnotationTemplateSummary } from "@/features/public-data-collection/server/firebase/form-annotation-templates-repository";
 import { AppBrand } from "./app-brand";
@@ -54,30 +55,39 @@ export function AdminDashboardClient({
       const form = forms.find((candidate) => candidate.id === formId);
       const pdfFile = formData.get("emptyPdf");
       const jsonFile = formData.get("annotationsJson");
+      const templateJsonText = String(formData.get("templateJsonText") || "").trim();
 
       if (!form) throw new Error("Choose a valid form type.");
-      if (!(pdfFile instanceof File) || pdfFile.size === 0) throw new Error("Upload the empty PDF.");
-      if (!(jsonFile instanceof File) || jsonFile.size === 0) throw new Error("Upload the annotation JSON.");
-      if (pdfFile.type !== "application/pdf" && !pdfFile.name.toLowerCase().endsWith(".pdf")) {
+      const uploadedPdf = pdfFile instanceof File && pdfFile.size > 0 ? pdfFile : undefined;
+      const uploadedJson = jsonFile instanceof File && jsonFile.size > 0 ? jsonFile : undefined;
+      if (uploadedPdf && uploadedPdf.type !== "application/pdf" && !uploadedPdf.name.toLowerCase().endsWith(".pdf")) {
         throw new Error("The empty form must be a PDF.");
       }
 
-      const parsed = JSON.parse(await jsonFile.text()) as Partial<AnnotationDocument>;
-      if (!parsed.metadata || !Array.isArray(parsed.annotations)) {
-        throw new Error("Annotation JSON must contain metadata and annotations.");
+      let parsed: AnnotationDocument;
+      if (templateJsonText || uploadedJson) {
+        const rawTemplate = templateJsonText || await uploadedJson!.text();
+        const result = annotationDocumentSchema.safeParse(JSON.parse(rawTemplate));
+        if (!result.success) {
+          const issue = result.error.issues[0];
+          throw new Error(`Invalid annotation JSON${issue?.path.length ? ` at ${issue.path.join(".")}` : ""}: ${issue?.message ?? "unknown error"}`);
+        }
+        parsed = result.data;
+      } else {
+        parsed = createEmptyAnnotationDocument(form.id, form.nameEn, uploadedPdf?.name ?? "");
       }
 
       setTemplateDraft({
         formId: form.id,
         formName: form.nameEn,
-        pdfFile,
-        pdfName: pdfFile.name,
+        pdfFile: uploadedPdf,
+        pdfName: uploadedPdf?.name ?? parsed.metadata.source,
         annotationsJson: {
           metadata: {
             ...parsed.metadata,
             id: form.id,
             name: form.nameEn,
-            source: parsed.metadata.source || pdfFile.name,
+            source: parsed.metadata.source || uploadedPdf?.name || "",
           },
           annotations: parsed.annotations,
         },
@@ -90,7 +100,12 @@ export function AdminDashboardClient({
   }
 
   if (templateDraft) {
-    return <AdminFormWorkspace templateDraft={templateDraft} />;
+    return (
+      <AdminFormWorkspace
+        templateDraft={templateDraft}
+        formDefinition={forms.find((form) => form.id === templateDraft.formId)}
+      />
+    );
   }
 
   return (
@@ -109,6 +124,10 @@ export function AdminDashboardClient({
             <h1>Manage form annotation templates.</h1>
             <p>Upload an empty PDF with annotation JSON to correct the reusable template, or review a saved filled document by unique form name.</p>
           </div>
+          <Link className="button button-primary admin-annotate-launch" href="/admin/annotate">
+            <FileJson size={16} />
+            Open annotation tool
+          </Link>
         </section>
 
         <section className="admin-dashboard-grid">
@@ -135,7 +154,7 @@ export function AdminDashboardClient({
               ))}
               {!savedTemplates.length && (
                 <p style={{ color: "var(--muted)", fontSize: 12, lineHeight: 1.5 }}>
-                  No saved templates yet. Upload an empty PDF with annotation JSON first.
+                  No saved templates yet. Open the editor to create or import one.
                 </p>
               )}
             </div>
@@ -146,7 +165,7 @@ export function AdminDashboardClient({
               <span className="admin-panel-icon"><FileJson size={22} /></span>
               <div>
                 <h2>Edit template</h2>
-                <p>Upload the empty form PDF and generated annotation JSON.</p>
+                <p>Paste template JSON, upload files, or start with an empty template.</p>
               </div>
             </div>
 
@@ -160,12 +179,23 @@ export function AdminDashboardClient({
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="admin-template-pdf">Empty PDF</label>
-                <input className="input" id="admin-template-pdf" name="emptyPdf" type="file" accept="application/pdf,.pdf" required />
+                <label htmlFor="admin-template-pdf">Empty PDF (optional)</label>
+                <input className="input" id="admin-template-pdf" name="emptyPdf" type="file" accept="application/pdf,.pdf" />
               </div>
               <div className="field">
-                <label htmlFor="admin-template-json">Annotation JSON</label>
-                <input className="input" id="admin-template-json" name="annotationsJson" type="file" accept="application/json,.json" required />
+                <label htmlFor="admin-template-json">Annotation JSON file (optional)</label>
+                <input className="input" id="admin-template-json" name="annotationsJson" type="file" accept="application/json,.json" />
+              </div>
+              <div className="field">
+                <label htmlFor="admin-template-json-text">Template JSON string (optional)</label>
+                <textarea
+                  className="textarea admin-template-json-text"
+                  id="admin-template-json-text"
+                  name="templateJsonText"
+                  placeholder={'{"metadata":{"schemaVersion":"1.1",...},"annotations":[]}'}
+                  spellCheck={false}
+                />
+                <small>Pasted JSON takes precedence over an uploaded JSON file.</small>
               </div>
 
               {templateError && <div className="error">{templateError}</div>}
@@ -231,4 +261,24 @@ export function AdminDashboardClient({
       </main>
     </div>
   );
+}
+
+function createEmptyAnnotationDocument(id: string, name: string, source: string): AnnotationDocument {
+  return {
+    metadata: {
+      schemaVersion: "1.1",
+      id,
+      name,
+      source,
+      pages: 0,
+      coordinateSystem: {
+        type: "normalized",
+        range: [0, 1000],
+        origin: "top-left",
+        bboxFormat: "[x1, y1, x2, y2]",
+      },
+      importantNote: "",
+    },
+    annotations: [],
+  };
 }

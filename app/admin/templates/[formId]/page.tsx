@@ -19,6 +19,7 @@ export default async function AdminTemplatePage({ params }: { params: Promise<{ 
 
   return (
     <AdminFormWorkspace
+      formDefinition={form}
       templateDraft={{
         formId: form.id,
         formName: template.formName || form.nameEn,

@@ -1,47 +1,11 @@
 import { z } from "zod";
+import { sriPageAnnotationSchema } from "@/features/public-data-collection/forms/annotation-types";
 import { approveSavedGeneratedFormDetails } from "@/features/public-data-collection/server/firebase/generated-form-details-repository";
 
 export const runtime = "nodejs";
 
-const sriPageLabelSchema = z.enum([
-  "Printed text",
-  "Handwritten text",
-  "Table",
-  "Title",
-  "Section-header",
-  "Logo",
-  "Page-header",
-  "Page-footer",
-  "List-item",
-  "Footnote",
-  "Signature",
-  "Stamp",
-]);
-
-const annotationSchema = z.object({
-  id: z.string().trim().min(1),
-  page: z.number().int().positive(),
-  readingOrder: z.number().int().positive(),
-  label: sriPageLabelSchema,
-  text: z.string().max(10_000),
-  bbox: z.tuple([
-    z.number().min(0).max(1000),
-    z.number().min(0).max(1000),
-    z.number().min(0).max(1000),
-    z.number().min(0).max(1000),
-  ]),
-  fieldKey: z.string().trim().min(1).optional(),
-  placeholder: z.boolean().optional(),
-  notes: z.string().max(2000).optional(),
-  renderMode: z.string().trim().min(1).max(120).optional(),
-  preprintedYear: z.number().int().positive().optional(),
-}).refine((annotation) => annotation.bbox[2] > annotation.bbox[0] && annotation.bbox[3] > annotation.bbox[1], {
-  message: "Bounding box must have positive width and height.",
-  path: ["bbox"],
-});
-
 const approveFormSchema = z.object({
-  annotations: z.array(annotationSchema).max(500),
+  annotations: z.array(sriPageAnnotationSchema).max(800),
 });
 
 export async function PATCH(request: Request, context: RouteContext<"/api/admin/forms/[formName]">) {
