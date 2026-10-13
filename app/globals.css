@@ -277,6 +277,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .textarea { min-height: 82px; resize: vertical; }
 .admin-template-json-text { min-height: 150px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; }
+.admin-correction-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.admin-correction-heading h3 { margin: 0; }
+.admin-correction-toggle { position: relative; display: inline-flex; align-items: center; gap: 7px; color: var(--forest); font-size: 10px; font-weight: 750; cursor: pointer; white-space: nowrap; }
+.admin-correction-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.admin-correction-quick-select { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 8px; margin-bottom: 8px; }
+.admin-correction-quick-select label { margin: 0; }
+.admin-correction-quick-select label span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 10px; }
 .admin-panel-help { color: var(--muted); line-height: 1.5; }
 .input:hover, .select:hover, .textarea:hover { border-color: #bbc6bf; }
 .file-drop { padding: 22px; border: 1px dashed #aebbb3; border-radius: 12px; background: #f8faf8; text-align: center; }

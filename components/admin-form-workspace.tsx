@@ -15,6 +15,7 @@ import {
 import { applyLlmValues, buildLlmValueRequest, parseLlmValues } from "@/features/public-data-collection/forms/annotation-llm-values";
 import type { DataCollectionForm } from "@/features/public-data-collection/forms/types";
 import { embedAnnotationValuesInPdf, isFilledAnswer } from "@/lib/client/embed-annotation-values";
+import { renderAnnotationOverlayPdf } from "@/lib/client/render-annotation-overlay";
 import { getIntersectingAnnotationIds } from "@/lib/annotation-selection";
 import type { SavedGeneratedFormDetails } from "@/features/public-data-collection/server/firebase/generated-form-details-repository";
 import { PdfPageCanvas, PdfThumbnails, usePdfDocument } from "./pdf-viewer";
@@ -77,15 +78,19 @@ function annotationColorStyle(label: SriPageLabel): CSSProperties {
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.2;
 const ZOOM_STEP = 0.15;
+const CORRECTION_FORM_NUMBER_KEY = "sripage.annotation.correctionFormNumber";
+const CORRECTION_VARIANT_KEY = "sripage.annotation.correctionVariant";
 
 export function AdminFormWorkspace({
   savedForm,
   templateDraft,
   formDefinition,
+  correctionTemplates = [],
 }: {
   savedForm?: SavedGeneratedFormDetails;
   templateDraft?: TemplateDraft;
   formDefinition?: DataCollectionForm;
+  correctionTemplates?: string[];
 }) {
   const isTemplateMode = Boolean(templateDraft);
   const canSaveTemplate = isTemplateMode && !templateDraft?.standalone;
@@ -105,6 +110,12 @@ export function AdminFormWorkspace({
     [annotations, formDefinition, templateDraft?.standalone, templateMetadata],
   );
   const [templateJsonText, setTemplateJsonText] = useState("");
+  const [formCorrectionMode, setFormCorrectionMode] = useState(true);
+  const [selectedCorrectionTemplate, setSelectedCorrectionTemplate] = useState("");
+  const [correctionFormNumber, setCorrectionFormNumber] = useState("");
+  const [correctionVariant, setCorrectionVariant] = useState("");
+  const [correctionLoadState, setCorrectionLoadState] = useState<"idle" | "loading">("idle");
+  const [correctionDownloadState, setCorrectionDownloadState] = useState<"idle" | "exporting">("idle");
   const [llmValuesText, setLlmValuesText] = useState("");
   const [llmCopyState, setLlmCopyState] = useState<"idle" | "copied">("idle");
   const [llmApplyNote, setLlmApplyNote] = useState("");
@@ -156,12 +167,6 @@ export function AdminFormWorkspace({
   useEffect(() => () => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
   }, [pdfUrl]);
-
-  useEffect(() => {
-    if (templateDraft?.pdfFile) {
-      loadPdfFile(templateDraft.pdfFile);
-    }
-  }, [templateDraft?.pdfFile]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -241,24 +246,6 @@ export function AdminFormWorkspace({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [groupSelection, pageAnnotations.length, selectedId, tool]);
-
-  function loadPdfFile(file: File | null) {
-    if (!file) return;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setSaveError("Choose a PDF document.");
-      return;
-    }
-
-    setPdfUrl((current) => {
-      if (current) URL.revokeObjectURL(current);
-      return URL.createObjectURL(file);
-    });
-    setPdfName(file.name);
-    setPageIndex(0);
-    setGroupSelection([]);
-    setPageSize({ width: 0, height: 0 });
-    setSaveError("");
-  }
 
   function updateAnnotation(id: string, patch: Partial<AdminAnnotation>) {
     setAnnotations((current) => current.map((annotation) => annotation.id === id ? { ...annotation, ...patch } : annotation));
@@ -495,6 +482,128 @@ export function AdminFormWorkspace({
       setTemplateJsonText("");
     } catch (reason) {
       setSaveError(getTemplateStringError(reason));
+    }
+  }
+
+  const loadCorrectionTemplate = useCallback(async (fileName: string) => {
+    setSelectedCorrectionTemplate(fileName);
+    if (!fileName) return;
+    setCorrectionLoadState("loading");
+    setSaveError("");
+    try {
+      const response = await fetch(`/annotated_jsons/${encodeURIComponent(fileName)}`);
+      if (!response.ok) throw new Error(`Could not load ${fileName}.`);
+      const parsed = annotationDocumentSchema.parse(await response.json());
+      setAnnotations(parsed.annotations);
+      setTemplateMetadata(parsed.metadata);
+      setSelectedId(parsed.annotations[0]?.id ?? null);
+      setPageIndex(0);
+      setGroupSelection([]);
+      setSaveState("idle");
+    } catch (reason) {
+      setSelectedCorrectionTemplate("");
+      setSaveError(getTemplateStringError(reason));
+    } finally {
+      setCorrectionLoadState("idle");
+    }
+  }, []);
+
+  useEffect(() => {
+    const formNumber = window.localStorage.getItem(CORRECTION_FORM_NUMBER_KEY) ?? "";
+    const variant = window.localStorage.getItem(CORRECTION_VARIANT_KEY) ?? "";
+    const restoreTimer = window.setTimeout(() => {
+      setCorrectionFormNumber(formNumber);
+      setCorrectionVariant(variant);
+      const fileName = getCorrectionTemplateFileName(formNumber, variant);
+      if (fileName && correctionTemplates.includes(fileName)) void loadCorrectionTemplate(fileName);
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, [correctionTemplates, loadCorrectionTemplate]);
+
+  function selectCorrectionByParts(formNumber: string, variant: string) {
+    setCorrectionFormNumber(formNumber);
+    setCorrectionVariant(variant);
+    window.localStorage.setItem(CORRECTION_FORM_NUMBER_KEY, formNumber);
+    window.localStorage.setItem(CORRECTION_VARIANT_KEY, variant);
+    const fileName = getCorrectionTemplateFileName(formNumber, variant);
+    if (fileName && correctionTemplates.includes(fileName)) {
+      void loadCorrectionTemplate(fileName);
+    } else {
+      setSelectedCorrectionTemplate("");
+    }
+  }
+
+  const selectCorrectionFromDropdown = useCallback((fileName: string) => {
+    const parts = parseCorrectionTemplateFileName(fileName);
+    if (parts) {
+      setCorrectionFormNumber(parts.formNumber);
+      setCorrectionVariant(parts.variant);
+      window.localStorage.setItem(CORRECTION_FORM_NUMBER_KEY, parts.formNumber);
+      window.localStorage.setItem(CORRECTION_VARIANT_KEY, parts.variant);
+    } else if (!fileName) {
+      setCorrectionFormNumber("");
+      setCorrectionVariant("");
+      window.localStorage.removeItem(CORRECTION_FORM_NUMBER_KEY);
+      window.localStorage.removeItem(CORRECTION_VARIANT_KEY);
+    }
+    void loadCorrectionTemplate(fileName);
+  }, [loadCorrectionTemplate]);
+
+  const loadPdfFile = useCallback((file: File | null) => {
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setSaveError("Choose a PDF document.");
+      return;
+    }
+
+    setPdfUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+    setPdfName(file.name);
+    setPageIndex(0);
+    setGroupSelection([]);
+    setPageSize({ width: 0, height: 0 });
+    setSaveError("");
+
+    if (formCorrectionMode) {
+      const matchingTemplate = findCorrectionTemplateForPdf(file.name, correctionTemplates);
+      if (matchingTemplate) selectCorrectionFromDropdown(matchingTemplate);
+    }
+  }, [correctionTemplates, formCorrectionMode, selectCorrectionFromDropdown]);
+
+  useEffect(() => {
+    const file = templateDraft?.pdfFile;
+    if (!file) return;
+    const loadTimer = window.setTimeout(() => loadPdfFile(file), 0);
+    return () => window.clearTimeout(loadTimer);
+  }, [loadPdfFile, templateDraft?.pdfFile]);
+
+  async function downloadCorrectionFiles() {
+    if (!document || !pdfUrl || !selectedCorrectionTemplate || !templateDraft) return;
+    setCorrectionDownloadState("exporting");
+    setPdfExportNote("");
+    setSaveError("");
+    try {
+      const baseName = getFileBaseName(selectedCorrectionTemplate.replace(/\.json$/i, ""));
+      const currentTemplate = getCurrentTemplateDocument(templateDraft, templateMetadata, annotations, `${baseName}.pdf`, document.numPages);
+      const sourceResponse = await fetch(pdfUrl);
+      if (!sourceResponse.ok) throw new Error("Could not read the uploaded PDF.");
+      const sourcePdf = await sourceResponse.blob();
+      const labelsPdf = await renderAnnotationOverlayPdf({ pdfDocument: document, annotations, textMode: "labels", onProgress: setPdfExportNote });
+      const annotationsPdf = await renderAnnotationOverlayPdf({ pdfDocument: document, annotations, textMode: "annotations", onProgress: setPdfExportNote });
+      const jsonBlob = new Blob([`${JSON.stringify(currentTemplate, null, 2)}\n`], { type: "application/json" });
+
+      downloadBlob(sourcePdf, `${baseName}.pdf`);
+      downloadBlob(jsonBlob, `${baseName}.json`);
+      downloadBlob(labelsPdf, `${baseName}_labels.pdf`);
+      downloadBlob(annotationsPdf, `${baseName}_annotations.pdf`);
+      setPdfExportNote(`Downloaded four correction files for ${baseName}.`);
+    } catch (reason) {
+      setSaveError(reason instanceof Error ? reason.message : "Could not create the correction downloads.");
+      setPdfExportNote("");
+    } finally {
+      setCorrectionDownloadState("idle");
     }
   }
 
@@ -1049,8 +1158,82 @@ export function AdminFormWorkspace({
 
           {isTemplateMode && (
             <div className="panel-section">
-              <h3>Load template string</h3>
+              <div className="admin-correction-heading">
+                <h3>Load template</h3>
+                <label className="toggle admin-correction-toggle" aria-label="Enable form correction mode">
+                  <input
+                    type="checkbox"
+                    checked={formCorrectionMode}
+                    onChange={(event) => setFormCorrectionMode(event.target.checked)}
+                  />
+                  <span className="toggle-track" aria-hidden="true" />
+                  <span>Form correction</span>
+                </label>
+              </div>
               <div className="form-grid">
+                {formCorrectionMode && (
+                  <>
+                    <div className="field">
+                      <label htmlFor="admin-correction-template">Annotated form</label>
+                      <div className="admin-correction-quick-select">
+                        <label>
+                          <span>Form number</span>
+                          <input
+                            className="input"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]{1,3}"
+                            maxLength={3}
+                            placeholder="001"
+                            value={correctionFormNumber}
+                            onChange={(event) => selectCorrectionByParts(event.target.value.replace(/\D/g, ""), correctionVariant)}
+                            onBlur={() => {
+                              const parsed = Number(correctionFormNumber);
+                              if (Number.isInteger(parsed) && parsed > 0) {
+                                selectCorrectionByParts(String(parsed).padStart(3, "0"), correctionVariant);
+                              }
+                            }}
+                          />
+                        </label>
+                        <label>
+                          <span>Variant</span>
+                          <input
+                            className="input"
+                            type="number"
+                            min={1}
+                            max={9}
+                            placeholder="1"
+                            value={correctionVariant}
+                            onChange={(event) => selectCorrectionByParts(correctionFormNumber, event.target.value)}
+                          />
+                        </label>
+                      </div>
+                      <select
+                        id="admin-correction-template"
+                        className="select"
+                        value={selectedCorrectionTemplate}
+                        onChange={(event) => selectCorrectionFromDropdown(event.target.value)}
+                        disabled={correctionLoadState === "loading"}
+                      >
+                        <option value="">Select an annotated form…</option>
+                        {correctionTemplates.map((fileName) => (
+                          <option key={fileName} value={fileName}>{fileName.replace(/\.json$/i, "")}</option>
+                        ))}
+                      </select>
+                      <small>{correctionLoadState === "loading" ? "Loading annotations…" : "Selecting a form loads its JSON automatically."}</small>
+                    </div>
+                    <button
+                      className="button button-primary admin-approve-button"
+                      type="button"
+                      onClick={() => void downloadCorrectionFiles()}
+                      disabled={!selectedCorrectionTemplate || !document || correctionDownloadState === "exporting"}
+                    >
+                      {correctionDownloadState === "exporting" ? <span className="spinner" /> : <Download size={16} />}
+                      {correctionDownloadState === "exporting" ? "Creating four files…" : "Download correction files"}
+                    </button>
+                    {!document && selectedCorrectionTemplate && <small>Upload the matching source PDF to enable the download.</small>}
+                  </>
+                )}
                 <textarea
                   className="textarea admin-template-json-text"
                   value={templateJsonText}
@@ -1336,7 +1519,7 @@ function getCurrentTemplateDocument(
       ...metadata,
       id: templateDraft.standalone ? metadata.id : templateDraft.formId,
       name: templateDraft.standalone ? metadata.name : templateDraft.formName,
-      source: templateDraft.annotationsJson.metadata.source || pdfName,
+      source: metadata.source || pdfName,
       ...(pageCount ? { pages: pageCount } : {}),
     },
     annotations: annotations.map(cleanAnnotationForSave),
@@ -1392,6 +1575,25 @@ function getFileBaseName(filename: string) {
   const leafName = filename.trim().split(/[\\/]/).at(-1) ?? "";
   const withoutExtension = leafName.replace(/\.pdf$/i, "");
   return withoutExtension || "filled-form";
+}
+
+function getCorrectionTemplateFileName(formNumber: string, variant: string) {
+  const parsedFormNumber = Number(formNumber);
+  const parsedVariant = Number(variant);
+  if (!Number.isInteger(parsedFormNumber) || parsedFormNumber < 1 || parsedFormNumber > 999) return null;
+  if (!Number.isInteger(parsedVariant) || parsedVariant < 1 || parsedVariant > 9) return null;
+  return `form_${String(parsedFormNumber).padStart(3, "0")}_${parsedVariant}.json`;
+}
+
+function findCorrectionTemplateForPdf(pdfFileName: string, correctionTemplates: string[]) {
+  const expectedTemplateName = `${getFileBaseName(pdfFileName)}.json`.toLocaleLowerCase();
+  return correctionTemplates.find((fileName) => fileName.toLocaleLowerCase() === expectedTemplateName);
+}
+
+function parseCorrectionTemplateFileName(fileName: string) {
+  const match = /^form_(\d{3})_([1-9])\.json$/i.exec(fileName);
+  if (!match) return null;
+  return { formNumber: match[1], variant: match[2] };
 }
 
 function resizeBBox([x1, y1, x2, y2]: AdminAnnotation["bbox"], dx: number, dy: number): AdminAnnotation["bbox"] {
