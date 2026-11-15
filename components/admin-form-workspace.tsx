@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, BoxSelect, Check, Copy, Download, Eye, EyeOff, FileText, MousePointer2, Plus, Save, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, BoxSelect, Check, Copy, Download, Eye, EyeOff, FileText, Moon, MousePointer2, Plus, Save, Sun, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import {
   SRI_PAGE_LANGUAGES,
   annotationDocumentSchema,
@@ -80,6 +80,21 @@ const MAX_ZOOM = 2.2;
 const ZOOM_STEP = 0.15;
 const CORRECTION_FORM_NUMBER_KEY = "sripage.annotation.correctionFormNumber";
 const CORRECTION_VARIANT_KEY = "sripage.annotation.correctionVariant";
+const ANNOTATION_THEME_KEY = "sripage.annotation.theme";
+const ANNOTATION_THEME_EVENT = "sripage-annotation-theme-change";
+
+function subscribeToAnnotationTheme(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(ANNOTATION_THEME_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(ANNOTATION_THEME_EVENT, onStoreChange);
+  };
+}
+
+function getAnnotationThemeSnapshot() {
+  return window.localStorage.getItem(ANNOTATION_THEME_KEY) !== "light";
+}
 
 export function AdminFormWorkspace({
   savedForm,
@@ -133,8 +148,9 @@ export function AdminFormWorkspace({
   const [zoom, setZoom] = useState(1);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [tool, setTool] = useState<Tool>("select");
-  const [showBoxLabels, setShowBoxLabels] = useState(true);
+  const [showBoxLabels, setShowBoxLabels] = useState(false);
   const [showAnnotationText, setShowAnnotationText] = useState(false);
+  const darkTheme = useSyncExternalStore(subscribeToAnnotationTheme, getAnnotationThemeSnapshot, () => true);
   const [selectedId, setSelectedId] = useState<string | null>(annotations[0]?.id ?? null);
   const [groupSelection, setGroupSelection] = useState<string[]>([]);
   const [drawStart, setDrawStart] = useState<Point | null>(null);
@@ -168,17 +184,28 @@ export function AdminFormWorkspace({
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
   }, [pdfUrl]);
 
+  function toggleTheme() {
+    window.localStorage.setItem(ANNOTATION_THEME_KEY, darkTheme ? "light" : "dark");
+    window.dispatchEvent(new Event(ANNOTATION_THEME_EVENT));
+  }
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       const target = event.target;
-      if (
-        event.metaKey
-        || event.ctrlKey
-        || event.altKey
-        || (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']"))
-      ) return;
-
+      const isEditableTarget = target instanceof Element
+        && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
       const key = event.key.toLowerCase();
+
+      if (key === "a" && (event.metaKey || event.ctrlKey) && !event.altKey && !isEditableTarget) {
+        event.preventDefault();
+        setTool("transform-all");
+        setSelectedId(null);
+        setGroupSelection(pageAnnotations.map((annotation) => annotation.id));
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey || isEditableTarget) return;
+
       if (key === "v") {
         event.preventDefault();
         setTool("select");
@@ -245,7 +272,7 @@ export function AdminFormWorkspace({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [groupSelection, pageAnnotations.length, selectedId, tool]);
+  }, [groupSelection, pageAnnotations, selectedId, tool]);
 
   function updateAnnotation(id: string, patch: Partial<AdminAnnotation>) {
     setAnnotations((current) => current.map((annotation) => annotation.id === id ? { ...annotation, ...patch } : annotation));
@@ -738,7 +765,7 @@ export function AdminFormWorkspace({
     : "";
 
   return (
-    <div className="workspace">
+    <div className={`workspace ${darkTheme ? "workspace-dark" : ""}`}>
       <header className="workspace-bar">
         <Link href="/admin" className="tool-button" style={{ color: "white" }} aria-label="Back to admin">
           <ArrowLeft size={17} />
@@ -747,6 +774,16 @@ export function AdminFormWorkspace({
           <strong>{workspaceTitle}</strong>
           <span>{pdfName || uploadPrompt} · {annotations.length} annotation{annotations.length === 1 ? "" : "s"} · {status}</span>
         </div>
+        <button
+          className="workspace-theme-toggle"
+          type="button"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${darkTheme ? "light" : "dark"} theme`}
+          title={`Switch to ${darkTheme ? "light" : "dark"} theme`}
+        >
+          {darkTheme ? <Sun size={16} /> : <Moon size={16} />}
+          <span>{darkTheme ? "Light" : "Dark"}</span>
+        </button>
       </header>
 
       <div className="editor-grid">
@@ -806,6 +843,8 @@ export function AdminFormWorkspace({
                   <button
                     className="tool-button admin-group-selection-action"
                     type="button"
+                    title="Select all annotations on this page (Cmd/Ctrl+A)"
+                    aria-keyshortcuts="Meta+A Control+A"
                     onClick={() => setGroupSelection(pageAnnotations.map((annotation) => annotation.id))}
                     disabled={groupSelection.length === pageAnnotations.length}
                   >
