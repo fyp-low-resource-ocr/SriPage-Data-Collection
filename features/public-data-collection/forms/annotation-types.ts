@@ -29,6 +29,7 @@ export interface SriPageAnnotation {
   language?: SriPageLanguage;
   fieldKey?: string;
   placeholder?: boolean;
+  intentionallyBlank?: boolean;
   groupId?: string;
   parentId?: string;
   rowIndex?: number;
@@ -73,6 +74,7 @@ export const sriPageAnnotationSchema: z.ZodType<SriPageAnnotation> = z.object({
   language: languageSchema.optional(),
   fieldKey: z.string().trim().min(1).optional(),
   placeholder: z.boolean().optional(),
+  intentionallyBlank: z.boolean().optional(),
   groupId: z.string().trim().min(1).optional(),
   parentId: z.string().trim().min(1).optional(),
   rowIndex: z.number().int().nonnegative().optional(),

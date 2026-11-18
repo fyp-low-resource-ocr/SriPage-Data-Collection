@@ -1059,12 +1059,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .workspace-public .admin-pdf-upload-empty h2 { color: var(--ink); }
 .workspace-public :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .pdf-upload-zone {
-  min-height: 420px;
-  margin: clamp(12px, 4vh, 48px) auto;
-  gap: 22px;
-  border: 1px dashed var(--muted);
-  border-radius: 20px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, .04);
+  min-height: 140px;
+  width: min(360px, 100%);
+  margin: 12px auto;
+  padding: 24px;
+  gap: 12px;
+  border: 2px dotted var(--muted);
+  border-radius: 14px;
+  box-shadow: none;
   transition: border-color .18s, box-shadow .18s, transform .18s;
 }
 .pdf-upload-icon {
@@ -1198,4 +1200,43 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 14px;
   font-weight: 600;
   line-height: 1;
+}
+
+.annotation-layer .resize-handle { cursor: nwse-resize; }
+.annotation-tool-select .admin-annotation-group { cursor: move; }
+.admin-selected-textarea,
+.workspace .input:not([type="number"]),
+.workspace .textarea { cursor: text; }
+
+.annotation-blank-option { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; cursor: pointer; }
+.annotation-blank-option input { accent-color: var(--ink); }
+.annotation-validation { margin-bottom: 14px; padding: 12px; border: 1px solid #d99845; border-radius: 8px; color: var(--ink); font-size: 12px; }
+.annotation-validation-list { display: grid; gap: 6px; max-height: 220px; overflow: auto; margin-top: 8px; }
+.annotation-validation-list button { text-align: left; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--wash); color: var(--ink); cursor: pointer; font-size: 11px; line-height: 1.5; }
+.annotation-validation-list button:hover { border-color: #d99845; }
+
+.annotation-section-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 18px; border: 0; border-bottom: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+.annotation-section-toggle:hover { background: var(--wash); }
+.annotation-section-toggle svg { transition: transform 240ms ease; }
+.annotation-section-toggle svg.expanded { transform: rotate(180deg); }
+.annotation-section-content { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 260ms ease, opacity 180ms ease; }
+.annotation-section-content.expanded { grid-template-rows: 1fr; opacity: 1; }
+.annotation-section-inner { min-height: 0; }
+.annotation-section-content:not(.expanded) > .annotation-section-inner { overflow: hidden; visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .annotation-section-content, .annotation-section-toggle svg { transition: none; } }
+
+.annotation-tabs { display: flex; padding: 6px; gap: 4px; border-bottom: 1px solid var(--line); background: var(--paper); }
+.annotation-tabs [role="tab"] { flex: 1; padding: 11px 6px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.annotation-tabs [role="tab"]:hover { background: var(--wash); color: var(--ink); }
+.annotation-tabs [role="tab"][aria-selected="true"] { background: var(--ink); color: var(--paper); }
+
+.editor-grid.awaiting-pdf { grid-template-columns: minmax(0, 1fr); }
+.awaiting-pdf > .side-panel,
+.awaiting-pdf .canvas-toolbar { display: none; }
+.awaiting-pdf .canvas-column { min-height: 0; }
+.awaiting-pdf .canvas-scroll { display: grid; place-items: center; padding: 24px; }
+.awaiting-pdf .pdf-upload-zone { width: min(460px, 100%); min-height: 180px; margin: 0; }
+@media (max-width: 760px) {
+  .editor-grid.awaiting-pdf { min-height: calc(100dvh - 100px); }
+  .awaiting-pdf .canvas-column { min-height: calc(100dvh - 100px); }
 }

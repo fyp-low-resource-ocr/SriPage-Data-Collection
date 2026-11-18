@@ -1,7 +1,9 @@
 "use client";
 
-import { ArrowLeft, BoxSelect, Check, ChevronLeft, Copy, Download, Eye, EyeOff, FileText, Moon, MousePointer2, Plus, Save, Sun, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, BoxSelect, Check, ChevronLeft, Copy, Download, Eye, EyeOff, FileText, Moon, MousePointer2, Plus, Redo2, Save, Sun, Undo2, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
+import { useAnnotationHistory } from "@/lib/client/use-annotation-history";
+import { validateAnnotations } from "@/lib/annotation-validation";
 import { CustomSelect } from "./custom-select";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import {
@@ -124,7 +126,12 @@ export function AdminFormWorkspace({
   const canSaveTemplate = !isPublic && isTemplateMode && !templateDraft?.standalone;
   const initialAnnotationsJson = templateDraft?.annotationsJson ?? savedForm?.annotationsJson ?? null;
   const storedAnnotations = initialAnnotationsJson?.annotations;
-  const [annotations, setAnnotations] = useState<AdminAnnotation[]>(() => storedAnnotations ?? []);
+  const { value: annotations, set: setAnnotations, undo, redo, begin: beginHistory, end: endHistory, canUndo, canRedo } = useAnnotationHistory<AdminAnnotation[]>(() => storedAnnotations ?? []);
+  const [sidebarSection, setSidebarSection] = useState<"load" | "edit">("edit");
+  const annotationTextRef = useRef<HTMLTextAreaElement>(null);
+  const boxClipboardRef = useRef<AdminAnnotation[]>([]);
+  const pasteCountRef = useRef(0);
+
   const [templateMetadata, setTemplateMetadata] = useState<AnnotationMetadata>(() => initialAnnotationsJson?.metadata ?? {
     schemaVersion: "1.1",
     id: templateDraft?.formId ?? "template",
@@ -180,12 +187,13 @@ export function AdminFormWorkspace({
     bounds?: Bounds;
     resizeHandle?: ResizeHandle;
   } | null>(null);
-  const setSize = useCallback((size: { width: number; height: number }) => setPageSize(size), []);
+  const setSize = useCallback((size: { width: number; height: number }) => setPageSize(size), [setPageSize]);
 
   const pageAnnotations = useMemo(
     () => annotations.filter((annotation) => annotation.page === pageIndex + 1),
     [annotations, pageIndex],
   );
+  const validationIssues = useMemo(() => validateAnnotations(annotations, document?.numPages ?? 0), [annotations, document?.numPages]);
   const selected = annotations.find((annotation) => annotation.id === selectedId) ?? null;
   const groupAnnotations = useMemo(
     () => pageAnnotations.filter((annotation) => groupSelection.includes(annotation.id)),
@@ -208,6 +216,48 @@ export function AdminFormWorkspace({
       const isEditableTarget = target instanceof Element
         && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
       const key = event.key.toLowerCase();
+
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !isEditableTarget && key === "c") {
+        const selectedIds = new Set(tool === "transform-all" ? groupSelection : selectedId ? [selectedId] : []);
+        const boxes = annotations.filter((annotation) => selectedIds.has(annotation.id));
+        if (!boxes.length) return;
+        event.preventDefault();
+        boxClipboardRef.current = structuredClone(boxes);
+        pasteCountRef.current = 0;
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !isEditableTarget && key === "v" && boxClipboardRef.current.length) {
+        event.preventDefault();
+        const source = boxClipboardRef.current;
+        const bounds = getGroupBounds(source);
+        if (!bounds) return;
+        const offset = 12 * ++pasteCountRef.current;
+        const idMap = new Map(source.map((annotation) => [annotation.id, crypto.randomUUID()]));
+        const readingOrder = getNextReadingOrder(annotations);
+        const pasted = moveAnnotations(source, bounds, offset, offset).map((annotation, index) => ({
+          ...annotation,
+          id: idMap.get(annotation.id)!,
+          parentId: annotation.parentId ? idMap.get(annotation.parentId) ?? annotation.parentId : undefined,
+          page: pageIndex + 1,
+          readingOrder: readingOrder + index,
+        }));
+        setAnnotations((current) => [...current, ...pasted]);
+        setSelectedId(pasted.length === 1 ? pasted[0].id : null);
+        setGroupSelection(pasted.length > 1 ? pasted.map((annotation) => annotation.id) : []);
+        setTool(pasted.length > 1 ? "transform-all" : "select");
+        setSaveState("idle");
+        setSaveError("");
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && !isEditableTarget && (key === "z" || key === "y")) {
+        event.preventDefault();
+        if (key === "y" || event.shiftKey) redo(); else undo();
+        setSaveState("idle");
+        setSaveError("");
+        return;
+      }
 
       if (key === "a" && (event.metaKey || event.ctrlKey) && !event.altKey && !isEditableTarget) {
         event.preventDefault();
@@ -285,7 +335,20 @@ export function AdminFormWorkspace({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [groupSelection, pageAnnotations, selectedId, tool]);
+  }, [annotations, groupSelection, pageAnnotations, pageIndex, selectedId, tool, redo, undo, setAnnotations]);
+
+  function duplicateSelectedAnnotation() {
+    const source = annotations.find((annotation) => annotation.id === selectedId);
+    if (!source) return;
+    boxClipboardRef.current = structuredClone([source]);
+    pasteCountRef.current = 1;
+    const duplicate = { ...source, id: crypto.randomUUID(), bbox: moveBBox(source.bbox, 12, 12), readingOrder: getNextReadingOrder(annotations) };
+    setAnnotations((current) => [...current, duplicate]);
+    setSelectedId(duplicate.id);
+    setTool("select");
+    setSaveState("idle");
+    setSaveError("");
+  }
 
   function updateAnnotation(id: string, patch: Partial<AdminAnnotation>) {
     setAnnotations((current) => current.map((annotation) => annotation.id === id ? { ...annotation, ...patch } : annotation));
@@ -314,6 +377,7 @@ export function AdminFormWorkspace({
     }
     setSelectedId(annotation.id);
     if (tool !== "select") return;
+    beginHistory();
     event.currentTarget.setPointerCapture(event.pointerId);
     interactionRef.current = {
       type: "move",
@@ -326,6 +390,7 @@ export function AdminFormWorkspace({
   function startResize(event: React.PointerEvent<SVGCircleElement>, annotation: AdminAnnotation) {
     event.stopPropagation();
     if (tool !== "select") return;
+    beginHistory();
     event.currentTarget.setPointerCapture(event.pointerId);
     interactionRef.current = {
       type: "resize",
@@ -342,6 +407,7 @@ export function AdminFormWorkspace({
   ) {
     event.stopPropagation();
     if (tool !== "transform-all" || !groupBounds) return;
+    beginHistory();
     event.currentTarget.setPointerCapture(event.pointerId);
     interactionRef.current = {
       type,
@@ -433,6 +499,7 @@ export function AdminFormWorkspace({
 
         setAnnotations((current) => [...current, annotation]);
         setSelectedId(annotation.id);
+        if (isPublic) setSidebarSection("edit");
         setTool("select");
         setSaveState("idle");
         setSaveError("");
@@ -442,6 +509,7 @@ export function AdminFormWorkspace({
     }
 
     interactionRef.current = null;
+    endHistory();
   }
 
   const selectionBox = selectionStart && selectionCurrent
@@ -505,6 +573,9 @@ export function AdminFormWorkspace({
 
   function exportTemplate() {
     if (!templateDraft) return;
+    if (isPublic) {
+      if (!document || !annotations.length || validationIssues.length) return;
+    }
     const template = getCurrentTemplateDocument(templateDraft, templateMetadata, annotations, pdfName, document?.numPages);
     downloadBlob(new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" }), "template.json");
   }
@@ -521,6 +592,7 @@ export function AdminFormWorkspace({
       setSaveState("idle");
       setSaveError("");
       setTemplateJsonText("");
+      if (isPublic) setSidebarSection("edit");
     } catch (reason) {
       setSaveError(getTemplateStringError(reason));
     }
@@ -547,7 +619,7 @@ export function AdminFormWorkspace({
     } finally {
       setCorrectionLoadState("idle");
     }
-  }, []);
+  }, [setAnnotations]);
 
   useEffect(() => {
     if (isPublic) return;
@@ -589,7 +661,7 @@ export function AdminFormWorkspace({
       window.localStorage.removeItem(CORRECTION_VARIANT_KEY);
     }
     void loadCorrectionTemplate(fileName);
-  }, [loadCorrectionTemplate]);
+  }, [loadCorrectionTemplate, setCorrectionFormNumber, setCorrectionVariant]);
 
   const loadPdfFile = useCallback((file: File | null) => {
     if (!file) return;
@@ -603,6 +675,7 @@ export function AdminFormWorkspace({
       return URL.createObjectURL(file);
     });
     setPdfName(file.name);
+    setSidebarSection("edit");
     setPageIndex(0);
     setGroupSelection([]);
     setPageSize({ width: 0, height: 0 });
@@ -807,7 +880,7 @@ export function AdminFormWorkspace({
         </button>
       </header>
 
-      <div className={`editor-grid ${pagesExpanded ? "" : "pages-collapsed"}`}>
+      <div className={`editor-grid ${pagesExpanded ? "" : "pages-collapsed"} ${isPublic && !document ? "awaiting-pdf" : ""}`}>
         <aside className="side-panel document-pages-panel">
           <div className="panel-head document-pages-heading">
             <div className="document-pages-title" aria-hidden={!pagesExpanded}>
@@ -845,6 +918,15 @@ export function AdminFormWorkspace({
           <div className="canvas-toolbar">
             <div className="tool-group">
               {!isPublic && <span className="admin-form-badge"><FileText size={14} /> Saved annotations</span>}
+              <button className="tool-button" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled={!canUndo} onClick={() => { undo(); setSaveState("idle"); setSaveError(""); }}>
+                <Undo2 size={16} />
+              </button>
+              <button className="tool-button" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled={!canRedo} onClick={() => { redo(); setSaveState("idle"); setSaveError(""); }}>
+                <Redo2 size={16} />
+              </button>
+              <button className="tool-button" type="button" title="Duplicate selected box" aria-label="Duplicate selected box" disabled={!selected} onClick={duplicateSelectedAnnotation}>
+                <Copy size={16} />
+              </button>
               <button className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move (V); use arrow keys to nudge" aria-keyshortcuts="V ArrowLeft ArrowRight ArrowUp ArrowDown" onClick={() => setTool("select")}>
                 <MousePointer2 size={15} />
               </button>
@@ -947,15 +1029,11 @@ export function AdminFormWorkspace({
           >
             {!pdfUrl ? (
               <div className="admin-pdf-upload-empty pdf-upload-zone">
-                <div className="pdf-upload-icon" aria-hidden="true">
-                  <FileText size={40} strokeWidth={1.4} />
-                  <span><Plus size={16} /></span>
-                </div>
                 <button className="button button-primary" type="button" onClick={() => pdfInputRef.current?.click()}>
                   <UploadCloud size={18} />
                   Upload PDF
                 </button>
-                <span className="pdf-upload-hint">or drag and drop your PDF here</span>
+                {isPublic && saveError && <div className="error" role="alert">{saveError}</div>}
               </div>
             ) : error ? (
               <div className="admin-pdf-upload-empty">
@@ -974,7 +1052,7 @@ export function AdminFormWorkspace({
                 <PdfPageCanvas document={document} pageIndex={pageIndex} scale={1.35 * zoom} onSize={setSize} />
                 {pageSize.width > 0 && (
                   <svg
-                    className="annotation-layer"
+                    className={`annotation-layer annotation-tool-${tool}`}
                     viewBox={`0 0 ${pageSize.width} ${pageSize.height}`}
                     width={pageSize.width}
                     height={pageSize.height}
@@ -1004,9 +1082,21 @@ export function AdminFormWorkspace({
                             width={box.width * pageSize.width}
                             height={box.height * pageSize.height}
                             className={`admin-annotation-box ${annotation.id === selectedId || (tool === "transform-all" && groupSelection.includes(annotation.id)) ? "active" : ""} ${selected?.questionId && annotation.questionId === selected.questionId && annotation.id !== selected.id ? "linked" : ""}`}
-                            style={annotationColorStyle(annotation.label)}
+                            style={{ ...annotationColorStyle(annotation.label), cursor: tool === "select" ? "move" : tool === "draw" ? "crosshair" : "pointer" }}
                             onPointerDown={(event) => startMove(event, annotation)}
-                          />
+                            onDoubleClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedId(annotation.id);
+                              if (isPublic) setSidebarSection("edit");
+                              setTool("select");
+                              requestAnimationFrame(() => {
+                                annotationTextRef.current?.focus();
+                                annotationTextRef.current?.select();
+                              });
+                            }}
+                          >
+                            <title>{tool === "select" ? "Drag to move · Double-click to edit text" : tool === "draw" ? "Draw annotation" : "Click to select box"}</title>
+                          </rect>
                           {showBoxLabels && (
                             <>
                               <rect
@@ -1143,6 +1233,23 @@ export function AdminFormWorkspace({
 
         <aside className="side-panel right">
           {(!isPublic || document) && <>
+          {isPublic && <div className="annotation-tabs" role="tablist" aria-label="Annotation tools">
+            {(["load", "edit"] as const).map((section) => (
+              <button key={section} id={`${section}-annotations-tab`} role="tab" type="button"
+                aria-selected={sidebarSection === section} aria-controls={`${section}-annotations-content`}
+                tabIndex={sidebarSection === section ? 0 : -1}
+                onClick={() => setSidebarSection(section)}
+                onKeyDown={(event) => {
+                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                  event.preventDefault();
+                  const next = event.key === "Home" ? "load" : event.key === "End" ? "edit" : section === "load" ? "edit" : "load";
+                  setSidebarSection(next);
+                  window.document.getElementById(`${next}-annotations-tab`)?.focus();
+                }}>
+                {section === "load" ? "Review annotations" : "Edit annotations"}
+              </button>
+            ))}
+          </div>}
           {!isPublic && <div className="panel-head">
             <h2>{isTemplateMode ? "Template text" : "Stored text"}</h2>
             <p>{isTemplateMode ? "Text and bounding boxes loaded from the uploaded annotation JSON." : "Text and bounding boxes loaded from the saved formDetails document."}</p>
@@ -1242,9 +1349,12 @@ export function AdminFormWorkspace({
           )}
 
           {isTemplateMode && (
+            <div>
+              <div id="load-annotations-content" role={isPublic ? "tabpanel" : undefined} aria-labelledby={isPublic ? "load-annotations-tab" : undefined} className={`annotation-section-content ${!isPublic || sidebarSection === "load" ? "expanded" : ""}`} inert={isPublic && sidebarSection !== "load"} aria-hidden={isPublic && sidebarSection !== "load"}>
+              <div className="annotation-section-inner">
             <div className="panel-section">
               <div className="admin-correction-heading">
-                <h3>{isPublic ? "Load annotations" : "Load template"}</h3>
+                {!isPublic && <h3>Load template</h3>}
                 {!isPublic && <label className="toggle admin-correction-toggle" aria-label="Enable form correction mode">
                   <input
                     type="checkbox"
@@ -1338,8 +1448,13 @@ export function AdminFormWorkspace({
                 <small>This replaces the annotations currently open in the editor.</small>
               </div>
             </div>
+              </div>
+              </div>
+            </div>
           )}
 
+          <div id="edit-annotations-content" role={isPublic ? "tabpanel" : undefined} aria-labelledby={isPublic ? "edit-annotations-tab" : undefined} className={`annotation-section-content ${!isPublic || sidebarSection === "edit" ? "expanded" : ""}`} inert={isPublic && sidebarSection !== "edit"} aria-hidden={isPublic && sidebarSection !== "edit"}>
+          <div className="annotation-section-inner">
           {selected && (
             <div className="panel-section">
               <h3>Selected annotation</h3>
@@ -1348,12 +1463,20 @@ export function AdminFormWorkspace({
                   <label htmlFor="admin-annotation-text">Text</label>
                   <textarea
                     id="admin-annotation-text"
+                    ref={annotationTextRef}
                     className="textarea admin-selected-textarea"
                     lang="si"
                     value={selected.text}
-                    onChange={(event) => updateAnnotation(selected.id, { text: event.target.value })}
+                    onChange={(event) => updateAnnotation(selected.id, { text: event.target.value, intentionallyBlank: event.target.value.trim() ? undefined : selected.intentionallyBlank })}
                   />
                 </div>
+                {isPublic && selected.label === "Handwritten text" && (
+                  <label className="annotation-blank-option">
+                    <input type="checkbox" checked={Boolean(selected.intentionallyBlank)} disabled={Boolean(selected.text.trim())}
+                      onChange={(event) => updateAnnotation(selected.id, { intentionallyBlank: event.target.checked || undefined })} />
+                    Intentionally blank
+                  </label>
+                )}
                 <div className="field">
                   <label htmlFor="admin-annotation-label">Label</label>
                   <CustomSelect
@@ -1396,7 +1519,14 @@ export function AdminFormWorkspace({
                   />
                 </div>
                 <dl className="admin-annotation-meta">
-                  <div><dt>Page</dt><dd>{selected.page}</dd></div>
+                  <div><dt>Page</dt><dd>{isPublic ? (
+                    <input className="input" type="number" aria-label="Annotation page" min={1} max={document?.numPages ?? 1} value={selected.page}
+                      onChange={(event) => {
+                        const page = Math.min(document?.numPages ?? 1, Math.max(1, Number(event.target.value) || 1));
+                        updateAnnotation(selected.id, { page });
+                        setPageIndex(page - 1);
+                      }} />
+                  ) : selected.page}</dd></div>
                 </dl>
                 {isTemplateMode && (
                   <div className="field">
@@ -1451,12 +1581,37 @@ export function AdminFormWorkspace({
           </div>
           {isPublic && isTemplateMode && (
             <div className="panel-section">
-              <button className="button button-primary admin-approve-button" type="button" onClick={exportTemplate}>
+              {(!annotations.length || validationIssues.length > 0) && (
+                <div className="annotation-validation" role="alert">
+                  <strong>{!annotations.length ? "Add an annotation before downloading." : `${new Set(validationIssues.map((issue) => issue.annotationId)).size} annotation(s) need attention`}</strong>
+                  <div className="annotation-validation-list">
+                    {validationIssues.map((issue, index) => (
+                      <button type="button" key={`${issue.annotationId}-${index}`} onClick={() => {
+                        setPageIndex(Math.min(Math.max(0, issue.page - 1), (document?.numPages ?? 1) - 1));
+                        setSelectedId(issue.annotationId);
+                        setGroupSelection([]);
+                        setTool("select");
+                        requestAnimationFrame(() => {
+                          annotationTextRef.current?.scrollIntoView({ block: "nearest" });
+                          if (issue.field === "text") annotationTextRef.current?.focus();
+                        });
+                      }}>
+                        Page {issue.page} · Box {issue.readingOrder}: {issue.message}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button className="button button-primary admin-approve-button" type="button" onClick={exportTemplate}
+                disabled={!document || !annotations.length || validationIssues.length > 0}
+                title={!annotations.length ? "Add an annotation to download" : validationIssues.length ? "Fix annotation issues to download" : "Download annotations"}>
                 <Download size={16} />
                 Download
               </button>
             </div>
           )}
+          </div>
+          </div>
           </>}
           {saveError && <div className="error public-save-error">{saveError}</div>}
         </aside>
