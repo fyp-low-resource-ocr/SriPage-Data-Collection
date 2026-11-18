@@ -14,7 +14,7 @@ export function PublicFormCatalog({ categories }: { categories: DataCollectionCa
         </div>
 
         {categories.map(({ category, forms }) => (
-          <div className="public-category-section" key={category.id} data-category={category.id}>
+          <div className="public-category-section" id={category.id} key={category.id} data-category={category.id}>
             <div className="public-category-heading">
               <h2>{category.nameEn}</h2>
               <span lang="si">{category.nameSi}</span>
