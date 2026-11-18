@@ -10,6 +10,7 @@ export type AnnotationDraft = {
   showBoxLabels: boolean;
   showAnnotationText: boolean;
   updatedAt: number;
+  keptReadingPositions?: Record<string, string>;
 };
 
 const DATABASE = "sripage-annotation-workspace";
@@ -47,7 +48,9 @@ export function parseAnnotationDraft(value: unknown): AnnotationDraft {
     || !Number.isFinite(draft.zoom) || draft.zoom < 0.25 || draft.zoom > 2.2) {
     throw new Error("The saved workspace could not be restored.");
   }
-  return { ...draft, document: annotationDocumentSchema.parse(draft.document), showBoxLabels: Boolean(draft.showBoxLabels), showAnnotationText: Boolean(draft.showAnnotationText) };
+  const keptReadingPositions = draft.keptReadingPositions && typeof draft.keptReadingPositions === "object" && !Array.isArray(draft.keptReadingPositions)
+    ? Object.fromEntries(Object.entries(draft.keptReadingPositions).filter(([, value]) => typeof value === "string")) : {};
+  return { ...draft, keptReadingPositions, document: annotationDocumentSchema.parse(draft.document), showBoxLabels: Boolean(draft.showBoxLabels), showAnnotationText: Boolean(draft.showAnnotationText) };
 }
 
 export async function readAnnotationDraft(): Promise<AnnotationDraft | null> {

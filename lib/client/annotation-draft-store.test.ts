@@ -5,7 +5,7 @@ const draft = (): AnnotationDraft => ({
   version: 1, pdf: new Blob(["pdf content"], { type: "application/pdf" }), pdfName: "sample.pdf",
   document: { metadata: { id: "sample", name: "Sample", source: "sample.pdf" }, annotations: [
     { id: "one", page: 1, readingOrder: 1, label: "Handwritten text", text: "", bbox: [10, 10, 50, 50], intentionallyBlank: true },
-  ] }, pageIndex: 0, zoom: 1.3, showBoxLabels: true, showAnnotationText: false, updatedAt: 123,
+  ] }, pageIndex: 0, zoom: 1.3, showBoxLabels: true, showAnnotationText: false, updatedAt: 123, keptReadingPositions: { one: "[1,10,10,50,50]" },
 });
 
 // Exercise the IndexedDB wrapper with asynchronous request and transaction completion.
@@ -46,6 +46,7 @@ describe("local annotation draft", () => {
     const restored = await readAnnotationDraft();
     expect(restored?.document.annotations[0].intentionallyBlank).toBe(true);
     expect(restored?.zoom).toBe(1.3);
+    expect(restored?.keptReadingPositions).toEqual({ one: "[1,10,10,50,50]" });
     expect(restored?.showBoxLabels).toBe(true);
     expect(await restored?.pdf?.text()).toBe("pdf content");
     await deleteAnnotationDraft();

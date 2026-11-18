@@ -2,10 +2,14 @@
 
 import { ArrowLeft, BoxSelect, Check, ChevronLeft, Copy, Download, Eye, EyeOff, FileText, Moon, MousePointer2, Plus, Redo2, Save, Sun, Undo2, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
+import { editSinhalaPhonetic, getSinhalaSpellingOptions, replacePhoneticSpelling, type PhoneticSession } from "@/lib/sinhala-phonetic";
+import { getTamil99Character, insertTamilCharacter } from "@/lib/tamil-keyboard";
 import { useAnnotationHistory } from "@/lib/client/use-annotation-history";
+import { moveAnnotationToPosition, readingPositionKey, suggestLocalReadingOrder } from "@/lib/annotation-reading-order";
 import { validateAnnotations } from "@/lib/annotation-validation";
 import { readAnnotationDraft, writeAnnotationDraft, deleteAnnotationDraft, type AnnotationDraft } from "@/lib/client/annotation-draft-store";
 import { AnnotationFieldLabel, FieldHelp } from "./field-help";
+import { ReadingOrderDialog } from "./reading-order-dialog";
 import { TooltipButton } from "./tooltip-button";
 import { CustomSelect } from "./custom-select";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
@@ -124,15 +128,26 @@ export function AdminFormWorkspace({
   const [pagesExpanded, setPagesExpanded] = useState(true);
   const [draggingPdf, setDraggingPdf] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
+  const jsonTextRef = useRef<HTMLTextAreaElement>(null);
+  const [jsonImportBusy, setJsonImportBusy] = useState(false);
+  const [showPasteJson, setShowPasteJson] = useState(false);
   const isPublic = mode === "public";
   const isTemplateMode = Boolean(templateDraft);
   const canSaveTemplate = !isPublic && isTemplateMode && !templateDraft?.standalone;
   const initialAnnotationsJson = templateDraft?.annotationsJson ?? savedForm?.annotationsJson ?? null;
   const storedAnnotations = initialAnnotationsJson?.annotations;
   const { value: annotations, set: setAnnotations, reset: resetAnnotations, undo, redo, begin: beginHistory, end: endHistory, canUndo, canRedo } = useAnnotationHistory<AdminAnnotation[]>(() => storedAnnotations ?? []);
+  const [typingPreference, setTypingPreference] = useState<{ annotationId: string; language: SriPageLanguage } | null>(null);
+  const typingSelectionRef = useRef<{ annotationId: string; start: number; end: number } | null>(null);
   const [sidebarSection, setSidebarSection] = useState<"load" | "edit">("edit");
+  const [keptReadingPositions, setKeptReadingPositions] = useState<Record<string, string>>({});
+  const [pendingReadingOrderId, setPendingReadingOrderId] = useState<string | null>(null);
   const [highlightValidation, setHighlightValidation] = useState(false);
   const validationListRef = useRef<HTMLDivElement>(null);
+  const bypassPhoneticInputRef = useRef(false);
+  const [spellingSession, setSpellingSession] = useState<PhoneticSession | null>(null);
+  const phoneticSessionRef = useRef<PhoneticSession | null>(null);
   const annotationTextRef = useRef<HTMLTextAreaElement>(null);
   const boxClipboardRef = useRef<AdminAnnotation[]>([]);
   const pasteCountRef = useRef(0);
@@ -198,16 +213,24 @@ export function AdminFormWorkspace({
     annotations?: AdminAnnotation[];
     bounds?: Bounds;
     resizeHandle?: ResizeHandle;
+    moved?: boolean;
   } | null>(null);
   const setSize = useCallback((size: { width: number; height: number }) => setPageSize(size), [setPageSize]);
 
   const pageAnnotations = useMemo(
-    () => annotations.filter((annotation) => annotation.page === pageIndex + 1),
+    () => annotations.filter((annotation) => annotation.page === pageIndex + 1).sort((a, b) => a.readingOrder - b.readingOrder),
     [annotations, pageIndex],
   );
   const validationIssues = useMemo(() => validateAnnotations(annotations, document?.numPages ?? 0), [annotations, document?.numPages]);
   const invalidAnnotationIds = useMemo(() => new Set(validationIssues.map((issue) => issue.annotationId)), [validationIssues]);
+  const readingOrderSuggestion = useMemo(() => isPublic && pendingReadingOrderId
+    ? suggestLocalReadingOrder(annotations, pendingReadingOrderId, keptReadingPositions) : null,
+    [annotations, isPublic, pendingReadingOrderId, keptReadingPositions]);
   const selected = annotations.find((annotation) => annotation.id === selectedId) ?? null;
+  const spellingOptions = spellingSession && selected?.id === spellingSession.scope
+    && selected.text.slice(spellingSession.start, spellingSession.start + spellingSession.rendered.length) === spellingSession.rendered
+    ? getSinhalaSpellingOptions(spellingSession.rendered) : [];
+  const typingLanguage = selected && typingPreference?.annotationId === selected.id ? typingPreference.language : selected?.language ?? "si";
   const groupAnnotations = useMemo(
     () => pageAnnotations.filter((annotation) => groupSelection.includes(annotation.id)),
     [groupSelection, pageAnnotations],
@@ -227,6 +250,7 @@ export function AdminFormWorkspace({
         pdfBlobRef.current = draft.pdf;
         if (draft.pdf) setPdfUrl(URL.createObjectURL(draft.pdf));
         setPdfName(draft.pdfName);
+        setKeptReadingPositions(draft.keptReadingPositions ?? {});
         resetAnnotations(draft.document.annotations);
         setTemplateMetadata(draft.document.metadata);
         setPageIndex(draft.pageIndex);
@@ -251,7 +275,7 @@ export function AdminFormWorkspace({
     const draft: AnnotationDraft = {
       version: 1, pdf: pdfBlobRef.current, pdfName,
       document: { metadata: templateMetadata, annotations },
-      pageIndex, zoom, showBoxLabels, showAnnotationText, updatedAt: Date.now(),
+      pageIndex, zoom, showBoxLabels, showAnnotationText, keptReadingPositions, updatedAt: Date.now(),
     };
     latestDraftRef.current = draft;
     draftTimerRef.current = setTimeout(() => {
@@ -265,7 +289,7 @@ export function AdminFormWorkspace({
     return () => {
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     };
-  }, [isPublic, draftReady, clearingDraft, annotations, templateMetadata, pdfName, pdfUrl, pageIndex, zoom, showBoxLabels, showAnnotationText]);
+  }, [isPublic, draftReady, clearingDraft, annotations, templateMetadata, pdfName, pdfUrl, pageIndex, zoom, showBoxLabels, showAnnotationText, keptReadingPositions]);
 
   useEffect(() => {
     if (!isPublic) return;
@@ -299,6 +323,8 @@ export function AdminFormWorkspace({
       setPdfUrl(null);
       setPdfName("");
       resetAnnotations([]);
+      setKeptReadingPositions({});
+      setPendingReadingOrderId(null);
       setTemplateMetadata({ schemaVersion: "1.1", id: "untitled-template", name: "Untitled template", source: "" });
       setPageIndex(0);
       setZoom(1);
@@ -458,13 +484,21 @@ export function AdminFormWorkspace({
     const duplicate = { ...source, id: crypto.randomUUID(), bbox: moveBBox(source.bbox, 12, 12), readingOrder: getNextReadingOrder(annotations) };
     setAnnotations((current) => [...current, duplicate]);
     setSelectedId(duplicate.id);
+    if (isPublic) setPendingReadingOrderId(duplicate.id);
     setTool("select");
     setSaveState("idle");
     setSaveError("");
   }
 
   function updateAnnotation(id: string, patch: Partial<AdminAnnotation>) {
-    setAnnotations((current) => current.map((annotation) => annotation.id === id ? { ...annotation, ...patch } : annotation));
+    setAnnotations((current) => {
+      const updated = current.map((annotation) => annotation.id === id ? { ...annotation, ...patch, readingOrder: annotation.readingOrder } : annotation);
+      if (patch.readingOrder !== undefined) {
+        if (isPublic) return moveAnnotationToPosition(updated, id, patch.readingOrder);
+        return updated.map((annotation) => annotation.id === id ? { ...annotation, readingOrder: patch.readingOrder! } : annotation);
+      }
+      return updated;
+    });
     setSaveState("idle");
     setSaveError("");
   }
@@ -564,6 +598,7 @@ export function AdminFormWorkspace({
             interaction.resizeHandle ?? "bottom-right",
             event.shiftKey,
           );
+      interaction.moved = transformed.some((box, index) => box.bbox.some((coordinate, axis) => coordinate !== interaction.annotations![index].bbox[axis]));
       const transformedById = new Map(transformed.map((annotation) => [annotation.id, annotation]));
       setAnnotations((current) => current.map((annotation) => transformedById.get(annotation.id) ?? annotation));
       setSaveState("idle");
@@ -576,6 +611,7 @@ export function AdminFormWorkspace({
       ? moveBBox(interaction.bbox, dx, dy)
       : resizeBBox(interaction.bbox, dx, dy);
 
+    interaction.moved = bbox.some((coordinate, index) => coordinate !== interaction.bbox![index]);
     updateAnnotation(interaction.annotationId, { bbox });
   }
 
@@ -614,7 +650,7 @@ export function AdminFormWorkspace({
 
         setAnnotations((current) => [...current, annotation]);
         setSelectedId(annotation.id);
-        if (isPublic) setSidebarSection("edit");
+        if (isPublic) { setSidebarSection("edit"); setPendingReadingOrderId(annotation.id); }
         setTool("select");
         setSaveState("idle");
         setSaveError("");
@@ -623,6 +659,12 @@ export function AdminFormWorkspace({
       setDrawCurrent(null);
     }
 
+    const interaction = interactionRef.current;
+    const movedId = interaction?.annotationId;
+    if (isPublic && interaction?.type === "move" && interaction.moved && movedId) {
+      setPendingReadingOrderId(movedId);
+      setSidebarSection("edit");
+    }
     interactionRef.current = null;
     endHistory();
   }
@@ -707,14 +749,20 @@ export function AdminFormWorkspace({
       }
     }
     const template = getCurrentTemplateDocument(templateDraft, templateMetadata, annotations, pdfName, document?.numPages);
-    downloadBlob(new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" }), "template.json");
+    const filename = isPublic ? `${getFileBaseName(pdfName)}-annotations.json` : "template.json";
+    downloadBlob(new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" }), filename);
   }
 
-  function loadTemplateString() {
-    if (!templateJsonText.trim()) return;
+  function importAnnotationJson(text: string) {
+    if (!text.trim()) {
+      setSaveError("The annotation JSON is empty.");
+      return;
+    }
     try {
-      const parsed = annotationDocumentSchema.parse(JSON.parse(templateJsonText));
+      const parsed = annotationDocumentSchema.parse(JSON.parse(text));
       setAnnotations(parsed.annotations);
+      setKeptReadingPositions({});
+      setPendingReadingOrderId(null);
       setTemplateMetadata(parsed.metadata);
       setSelectedId(parsed.annotations[0]?.id ?? null);
       setPageIndex(0);
@@ -722,9 +770,50 @@ export function AdminFormWorkspace({
       setSaveState("idle");
       setSaveError("");
       setTemplateJsonText("");
+      setShowPasteJson(false);
       if (isPublic) setSidebarSection("edit");
     } catch (reason) {
       setSaveError(getTemplateStringError(reason));
+    }
+  }
+
+  function loadTemplateString() {
+    importAnnotationJson(templateJsonText);
+  }
+
+  async function uploadAnnotationJson(file: File | undefined) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      setSaveError("Choose an annotation JSON file (.json).");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setSaveError("Choose a JSON file smaller than 10 MB.");
+      return;
+    }
+    setJsonImportBusy(true);
+    try {
+      importAnnotationJson(await file.text());
+    } catch {
+      setSaveError("Could not read the JSON file. Try pasting its contents instead.");
+    } finally {
+      setJsonImportBusy(false);
+    }
+  }
+
+  async function pasteAnnotationJson() {
+    setShowPasteJson(true);
+    requestAnimationFrame(() => jsonTextRef.current?.focus());
+    setJsonImportBusy(true);
+    try {
+      const text = await navigator.clipboard.readText();
+      setTemplateJsonText(text);
+      setSaveError(text.trim() ? "" : "The clipboard is empty. Copy annotation JSON first.");
+    } catch {
+      setSaveError("Clipboard access is unavailable. Paste your JSON into the text box.");
+    } finally {
+      setJsonImportBusy(false);
+      jsonTextRef.current?.focus();
     }
   }
 
@@ -738,6 +827,8 @@ export function AdminFormWorkspace({
       if (!response.ok) throw new Error(`Could not load ${fileName}.`);
       const parsed = annotationDocumentSchema.parse(await response.json());
       setAnnotations(parsed.annotations);
+      setKeptReadingPositions({});
+      setPendingReadingOrderId(null);
       setTemplateMetadata(parsed.metadata);
       setSelectedId(parsed.annotations[0]?.id ?? null);
       setPageIndex(0);
@@ -1017,6 +1108,23 @@ export function AdminFormWorkspace({
         </TooltipButton>
       </header>
 
+      {readingOrderSuggestion && pendingReadingOrderId && (
+        <ReadingOrderDialog
+          current={readingOrderSuggestion.box}
+          position={readingOrderSuggestion.position}
+          previous={readingOrderSuggestion.previous}
+          next={readingOrderSuggestion.next}
+          reason={readingOrderSuggestion.reason}
+          onApply={() => {
+            updateAnnotation(pendingReadingOrderId, { readingOrder: readingOrderSuggestion.position });
+            setPendingReadingOrderId(null);
+          }}
+          onKeep={() => {
+            setKeptReadingPositions((current) => ({ ...current, [pendingReadingOrderId]: readingPositionKey(readingOrderSuggestion.box) }));
+            setPendingReadingOrderId(null);
+          }}
+        />
+      )}
       {isPublic && !draftReady && <div className="workspace-restore-overlay" role="status"><span className="spinner" /> Restoring workspace…</div>}
       <div inert={isPublic && (!draftReady || clearingDraft)} className={`editor-grid ${pagesExpanded ? "" : "pages-collapsed"} ${isPublic && !document ? "awaiting-pdf" : ""}`}>
         <aside className="side-panel document-pages-panel">
@@ -1213,6 +1321,7 @@ export function AdminFormWorkspace({
                       });
                       setAnnotations((current) => [...current, annotation]);
                       setSelectedId(annotation.id);
+                      setPendingReadingOrderId(annotation.id);
                       setTool("select");
                       setSidebarSection("edit");
                       setSaveState("idle");
@@ -1262,6 +1371,14 @@ export function AdminFormWorkspace({
                           >
                             <title>{tool === "select" ? "Drag to move · Double-click to edit text" : tool === "draw" ? "Draw annotation" : "Click to select box"}</title>
                           </rect>
+                          <text
+                            x={boxX + 4}
+                            y={boxY + 12}
+                            className="annotation-reading-order-number"
+                            pointerEvents="none"
+                          >
+                            {annotation.readingOrder}
+                          </text>
                           {showBoxLabels && (
                             <>
                               <rect
@@ -1595,9 +1712,24 @@ export function AdminFormWorkspace({
                     {!document && selectedCorrectionTemplate && <small>Upload the matching source PDF to enable the download.</small>}
                   </>
                 )}
-                <AnnotationFieldLabel htmlFor="annotation-import-json" label="Annotation JSON" help="Paste a previously downloaded annotation JSON document. Loading it replaces the current boxes and text; your uploaded PDF stays in place." />
+                {isPublic && <>
+                  <input ref={jsonInputRef} type="file" accept="application/json,.json" hidden aria-label="Choose annotation JSON"
+                    onChange={(event) => { void uploadAnnotationJson(event.target.files?.[0]); event.target.value = ""; }} />
+                  <div className="annotation-import-actions">
+                    <button type="button" className="button button-secondary" disabled={jsonImportBusy} onClick={() => jsonInputRef.current?.click()}>
+                      <UploadCloud size={15} /> {jsonImportBusy ? "Reading…" : "Upload JSON"}
+                    </button>
+                    <button type="button" className="button button-secondary" aria-expanded={showPasteJson} aria-controls="annotation-paste-section" disabled={jsonImportBusy} onClick={() => void pasteAnnotationJson()}>
+                      <Copy size={15} /> Paste JSON
+                    </button>
+                  </div>
+                  <span className="annotation-import-note">Upload a saved file, or choose Paste JSON.</span>
+                </>}
+                {(!isPublic || showPasteJson) && <div id="annotation-paste-section" className="form-grid annotation-paste-section">
+                <AnnotationFieldLabel htmlFor="annotation-import-json" label={isPublic ? "Paste JSON" : "Annotation JSON"} help="Upload a previously downloaded JSON file, or paste its contents here. Importing replaces the current boxes and text; your uploaded PDF stays in place." />
                 <textarea
                   id="annotation-import-json"
+                  ref={jsonTextRef}
                   aria-describedby="annotation-import-json-help"
                   className="textarea admin-template-json-text"
                   value={templateJsonText}
@@ -1610,11 +1742,12 @@ export function AdminFormWorkspace({
                   className="button button-secondary admin-approve-button"
                   type="button"
                   onClick={loadTemplateString}
-                  disabled={!templateJsonText.trim()}
+                  disabled={!templateJsonText.trim() || jsonImportBusy}
                 >
-                  {isPublic ? "Load annotations" : "Load template string"}
+                  {isPublic ? "Import JSON" : "Load template string"}
                 </button>
                 <small>This replaces the annotations currently open in the editor.</small>
+                </div>}
               </div>
             </div>
               </div>
@@ -1630,16 +1763,158 @@ export function AdminFormWorkspace({
               <div className="form-grid">
                 <div className="field">
                   <AnnotationFieldLabel htmlFor="admin-annotation-text" label="Text" help="Enter the text visible inside this box. Signatures, stamps, logos, and tables may be left empty." />
+                  <div className="annotation-typing-controls">
+                    <div className="annotation-language-buttons" role="group" aria-label="Typing keyboard">
+                      {SRI_PAGE_LANGUAGES.map((language) => (
+                        <button type="button" key={language} aria-pressed={typingLanguage === language}
+                          onClick={() => {
+                            setTypingPreference({ annotationId: selected.id, language });
+                            phoneticSessionRef.current = null;
+                            requestAnimationFrame(() => {
+                              const input = annotationTextRef.current;
+                              if (!input) return;
+                              input.focus();
+                              const selection = typingSelectionRef.current;
+                              if (selection?.annotationId === selected.id) input.setSelectionRange(selection.start, selection.end);
+                            });
+                          }}
+                          title={language === "si" ? "Sinhala · phonetic keyboard" : language === "ta" ? "Tamil · Tamil99 keyboard" : "English keyboard"}>
+                          <span lang={language} className="custom-select-language-icon" aria-hidden="true">{LANGUAGE_DISPLAY[language].symbol}</span>
+                          <span>{language === "si" ? "Sinhala" : language === "ta" ? "Tamil" : "English"}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <FieldHelp id="annotation-typing-help" label="Typing keyboard" text="Switch keyboards to type mixed text such as K.K. කමල්. Sinhala uses phonetic typing and Tamil uses Tamil99. These buttons do not change the annotation language or label. Use the Language dropdown to classify the annotation. Pasted text and native Sinhala/Tamil keyboards work normally. Caps Lock temporarily bypasses the built-in keyboard." />
+                  </div>
                   <textarea
                     id="admin-annotation-text"
-                    aria-describedby="admin-annotation-text-help"
+                    aria-describedby="admin-annotation-text-help annotation-typing-help"
                     ref={annotationTextRef}
                     className="textarea admin-selected-textarea"
                     lang={selected.language ?? "si"}
+                    spellCheck={typingLanguage !== "en" ? false : undefined}
+                    autoCorrect={typingLanguage !== "en" ? "off" : undefined}
                     value={selected.text}
-                    onChange={(event) => updateAnnotation(selected.id, { text: event.target.value, intentionallyBlank: event.target.value.trim() ? undefined : selected.intentionallyBlank })}
+                    onKeyDown={(event) => {
+                      bypassPhoneticInputRef.current = false;
+                      const language = typingLanguage;
+                      if (language === "en" || event.nativeEvent.isComposing || event.keyCode === 229) {
+                        bypassPhoneticInputRef.current = true;
+                        phoneticSessionRef.current = null;
+                        return;
+                      }
+                      if ((event.metaKey || event.ctrlKey) && !event.altKey && ["z", "y"].includes(event.key.toLowerCase())) {
+                        event.preventDefault();
+                        phoneticSessionRef.current = null;
+                        if (event.shiftKey || event.key.toLowerCase() === "y") redo(); else undo();
+                        setSaveState("idle");
+                        setSaveError("");
+                        return;
+                      }
+                      if (language === "si") {
+                        if (event.ctrlKey || event.metaKey || event.altKey || event.getModifierState("CapsLock")) {
+                          bypassPhoneticInputRef.current = true;
+                          phoneticSessionRef.current = null;
+                          return;
+                        }
+                        if (event.key !== "Backspace" && !/^[a-zA-Z]$/.test(event.key)) {
+                          phoneticSessionRef.current = null;
+                          return;
+                        }
+                        const input = event.currentTarget;
+                        const result = editSinhalaPhonetic(input.value, input.selectionStart, input.selectionEnd, event.key, selected.id, phoneticSessionRef.current);
+                        if (!result) { phoneticSessionRef.current = null; return; }
+                        event.preventDefault();
+                        phoneticSessionRef.current = result.session;
+                        setSpellingSession(result.session);
+                        updateAnnotation(selected.id, { text: result.text, intentionallyBlank: result.text.trim() ? undefined : selected.intentionallyBlank });
+                        requestAnimationFrame(() => {
+                          if (input.isConnected && window.document.activeElement === input) input.setSelectionRange(result.caret, result.caret);
+                        });
+                        return;
+                      }
+                      const keyboardEvent = {
+                        key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey,
+                        isComposing: event.nativeEvent.isComposing, capsLock: event.getModifierState("CapsLock"),
+                      };
+                      const character = getTamil99Character(keyboardEvent);
+                      if (character === null) return;
+                      event.preventDefault();
+                      const input = event.currentTarget;
+                      const result = insertTamilCharacter(input.value, input.selectionStart, input.selectionEnd, character);
+                      updateAnnotation(selected.id, { text: result.text, intentionallyBlank: result.text.trim() ? undefined : selected.intentionallyBlank });
+                      requestAnimationFrame(() => {
+                        if (input.isConnected && window.document.activeElement === input) input.setSelectionRange(result.caret, result.caret);
+                      });
+                    }}
+                    onPointerDown={() => { phoneticSessionRef.current = null; }}
+                    onBlur={(event) => {
+                      phoneticSessionRef.current = null;
+                      typingSelectionRef.current = { annotationId: selected.id, start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
+                    }}
+                    onPaste={() => { phoneticSessionRef.current = null; }}
+                    onCompositionStart={() => { phoneticSessionRef.current = null; bypassPhoneticInputRef.current = true; }}
+                    onChange={(event) => {
+                      const input = event.currentTarget;
+                      const native = event.nativeEvent as InputEvent;
+                      const bypass = bypassPhoneticInputRef.current;
+                      bypassPhoneticInputRef.current = false;
+                      // Hardware keydown is handled above. This path supports non-composing insertText events from virtual keyboards.
+                      if (!bypass && typingLanguage === "si" && native.inputType === "insertText" && !native.isComposing && native.data && /^[a-zA-Z]+$/.test(native.data)) {
+                        const start = input.selectionStart - native.data.length;
+                        const end = selected.text.length - (input.value.length - input.selectionStart);
+                        const result = editSinhalaPhonetic(selected.text, start, end, native.data, selected.id, phoneticSessionRef.current);
+                        if (result) {
+                          phoneticSessionRef.current = result.session;
+                        setSpellingSession(result.session);
+                          updateAnnotation(selected.id, { text: result.text, intentionallyBlank: undefined });
+                          requestAnimationFrame(() => { if (window.document.activeElement === input) input.setSelectionRange(result.caret, result.caret); });
+                          return;
+                        }
+                      }
+                      phoneticSessionRef.current = null;
+                      updateAnnotation(selected.id, { text: input.value, intentionallyBlank: input.value.trim() ? undefined : selected.intentionallyBlank });
+                    }}
                   />
                 </div>
+                {typingLanguage === "si" && spellingSession && spellingOptions.length > 1 && (
+                  <div className="phonetic-spelling-options" aria-label="Sinhala spelling options">
+                    <span>Choose spelling</span>
+                    <div>
+                      {spellingOptions.map((spelling) => (
+                        <button type="button" lang="si" key={spelling} aria-pressed={spelling === spellingSession.rendered}
+                          onClick={() => {
+                            const result = replacePhoneticSpelling(selected.text, spellingSession, spelling);
+                            if (!result) return;
+                            updateAnnotation(selected.id, { text: result.text, intentionallyBlank: undefined });
+                            phoneticSessionRef.current = null;
+                            setSpellingSession(null);
+                            requestAnimationFrame(() => {
+                              const input = annotationTextRef.current;
+                              input?.focus();
+                              input?.setSelectionRange(result.caret, result.caret);
+                            });
+                          }}>{spelling}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {typingLanguage === "si" && (
+                  <details className="annotation-keyboard-guide">
+                    <summary>Sinhala phonetic typing guide</summary>
+                    <p>mama → මම · amma → අම්ම · aayuboowan → ආයුබෝවන්</p>
+                    <p>ka → ක · kaa → කා · ki → කි · shrii → ශ්‍රී</p>
+                    <p>Type words by sound. Double vowels for long sounds. Ambiguous sounds show spelling choices; sandun offers සඳුන්. Space or punctuation starts a new word. Caps Lock temporarily types English.</p>
+                  </details>
+                )}
+                {typingLanguage === "ta" && (
+                  <details className="annotation-keyboard-guide">
+                    <summary>Tamil99 key guide</summary>
+                    <p>h → க · k → ம · l → த · s → இ · f → ்</p>
+                    <p>hq → கா · hs → கி · hh → க்க · lks/f → தமிழ்</p>
+                    <p>Type consonants followed by vowels. Shift gives alternate letters. Caps Lock temporarily types English.</p>
+                  </details>
+                )}
                 {isPublic && selected.label === "Handwritten text" && (
                   <div className="field-label-with-help">
                   <label className="annotation-blank-option">
@@ -1662,13 +1937,14 @@ export function AdminFormWorkspace({
                   />
                 </div>
                 <div className="field">
-                  <AnnotationFieldLabel htmlFor="admin-annotation-reading-order" label="Reading order" help="The order in which this region should be read on the document. Start at 1 and follow the natural reading sequence." />
+                  <AnnotationFieldLabel htmlFor="admin-annotation-reading-order" label="Reading order" help={isPublic ? "Move this box to a reading position. Other boxes are renumbered automatically, keeping their relative order. For side-by-side boxes, choose the sequence in which they should be read." : "The order in which this region should be read on the document. Start at 1 and follow the natural reading sequence."} />
                   <input
                     id="admin-annotation-reading-order"
                     aria-describedby="admin-annotation-reading-order-help"
                     className="input"
                     type="number"
                     min={1}
+                    max={isPublic ? annotations.length : undefined}
                     value={selected.readingOrder}
                     onChange={(event) => updateAnnotation(selected.id, { readingOrder: Math.max(1, Number(event.target.value) || 1) })}
                   />
@@ -1690,9 +1966,13 @@ export function AdminFormWorkspace({
                     id="admin-annotation-language"
                     aria-describedby="admin-annotation-language-help"
                     native={!isPublic}
-                    value={selected.language ?? ""}
-                    options={[{ value: "", label: "Not specified" }, ...SRI_PAGE_LANGUAGES.map((language) => ({ value: language, label: isPublic ? LANGUAGE_DISPLAY[language].label : language, symbol: LANGUAGE_DISPLAY[language].symbol, lang: language }))]}
-                    onChange={(value) => updateAnnotation(selected.id, { language: (value || undefined) as SriPageLanguage | undefined })}
+                    value={isPublic ? selected.language ?? "si" : selected.language ?? ""}
+                    options={[...(!isPublic ? [{ value: "", label: "Not specified" }] : []), ...SRI_PAGE_LANGUAGES.map((language) => ({ value: language, label: isPublic ? LANGUAGE_DISPLAY[language].label : language, symbol: LANGUAGE_DISPLAY[language].symbol, lang: language }))]}
+                    onChange={(value) => {
+                      updateAnnotation(selected.id, { language: (value || undefined) as SriPageLanguage | undefined });
+                      setTypingPreference({ annotationId: selected.id, language: (value || "si") as SriPageLanguage });
+                      phoneticSessionRef.current = null;
+                    }}
                   />
                 </div>
                 <dl className="admin-annotation-meta">
