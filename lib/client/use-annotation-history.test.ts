@@ -4,6 +4,14 @@ import { reduceHistory } from "./use-annotation-history";
 const initial = () => ({ present: [1], past: [] as number[][], future: [] as number[][], transaction: null as number[] | null });
 
 describe("annotation history", () => {
+  it("resets undo and redo when restoring or clearing a workspace", () => {
+    let state = reduceHistory(initial(), { type: "set", value: [2] });
+    state = reduceHistory(state, { type: "undo" });
+    state = reduceHistory(state, { type: "reset", value: [] });
+    expect(state).toEqual({ present: [], past: [], future: [], transaction: null });
+    expect(reduceHistory(state, { type: "undo" }).present).toEqual([]);
+    expect(reduceHistory(state, { type: "redo" }).present).toEqual([]);
+  });
   it("groups pointer updates into one undo step and supports redo", () => {
     let state = reduceHistory(initial(), { type: "begin" });
     state = reduceHistory(state, { type: "set", value: [2] });

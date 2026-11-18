@@ -1240,3 +1240,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .editor-grid.awaiting-pdf { min-height: calc(100dvh - 100px); }
   .awaiting-pdf .canvas-column { min-height: calc(100dvh - 100px); }
 }
+
+.local-draft-controls { display: flex; align-items: center; gap: 14px; margin-left: auto; color: #cccccc; font-size: 11px; }
+.local-draft-controls button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; background: transparent; border: 1px solid #555555; border-radius: 7px; color: #eeeeee; cursor: pointer; }
+.local-draft-controls button:disabled { opacity: .4; cursor: not-allowed; }
+.local-draft-controls + .workspace-theme-toggle { margin-left: 0; }
+.workspace-restore-overlay { position: fixed; inset: 68px 0 0; z-index: 90; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--paper); color: var(--muted); font-size: 13px; }
+@media (max-width: 760px) { .local-draft-controls { gap: 8px; flex-wrap: wrap; } }
+
+.annotation-validation-highlight { fill: none; stroke: #e24a4a; stroke-width: 2; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; }
+.annotation-validation p { margin: 8px 0; line-height: 1.5; }
+.workspace-public .admin-approve-button[aria-disabled="true"] { opacity: .45; cursor: help; transform: none; }

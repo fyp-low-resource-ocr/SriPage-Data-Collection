@@ -4,6 +4,7 @@ import { ArrowLeft, BoxSelect, Check, ChevronLeft, Copy, Download, Eye, EyeOff, 
 import Link from "next/link";
 import { useAnnotationHistory } from "@/lib/client/use-annotation-history";
 import { validateAnnotations } from "@/lib/annotation-validation";
+import { readAnnotationDraft, writeAnnotationDraft, deleteAnnotationDraft, type AnnotationDraft } from "@/lib/client/annotation-draft-store";
 import { CustomSelect } from "./custom-select";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import {
@@ -126,8 +127,10 @@ export function AdminFormWorkspace({
   const canSaveTemplate = !isPublic && isTemplateMode && !templateDraft?.standalone;
   const initialAnnotationsJson = templateDraft?.annotationsJson ?? savedForm?.annotationsJson ?? null;
   const storedAnnotations = initialAnnotationsJson?.annotations;
-  const { value: annotations, set: setAnnotations, undo, redo, begin: beginHistory, end: endHistory, canUndo, canRedo } = useAnnotationHistory<AdminAnnotation[]>(() => storedAnnotations ?? []);
+  const { value: annotations, set: setAnnotations, reset: resetAnnotations, undo, redo, begin: beginHistory, end: endHistory, canUndo, canRedo } = useAnnotationHistory<AdminAnnotation[]>(() => storedAnnotations ?? []);
   const [sidebarSection, setSidebarSection] = useState<"load" | "edit">("edit");
+  const [highlightValidation, setHighlightValidation] = useState(false);
+  const validationListRef = useRef<HTMLDivElement>(null);
   const annotationTextRef = useRef<HTMLTextAreaElement>(null);
   const boxClipboardRef = useRef<AdminAnnotation[]>([]);
   const pasteCountRef = useRef(0);
@@ -161,6 +164,13 @@ export function AdminFormWorkspace({
   const [status, setStatus] = useState(savedForm?.status ?? "template");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
+  const [draftReady, setDraftReady] = useState(false);
+  const [localSaveStatus, setLocalSaveStatus] = useState("Restoring workspace…");
+  const [clearingDraft, setClearingDraft] = useState(false);
+  const pdfBlobRef = useRef<Blob | null>(null);
+  const latestDraftRef = useRef<AnnotationDraft | null>(null);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftRevisionRef = useRef(0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(templateDraft?.pdfUrl ?? null);
   const [pdfName, setPdfName] = useState(templateDraft?.pdfUrl ? templateDraft.pdfName : "");
   const { document, error } = usePdfDocument(pdfUrl);
@@ -194,6 +204,7 @@ export function AdminFormWorkspace({
     [annotations, pageIndex],
   );
   const validationIssues = useMemo(() => validateAnnotations(annotations, document?.numPages ?? 0), [annotations, document?.numPages]);
+  const invalidAnnotationIds = useMemo(() => new Set(validationIssues.map((issue) => issue.annotationId)), [validationIssues]);
   const selected = annotations.find((annotation) => annotation.id === selectedId) ?? null;
   const groupAnnotations = useMemo(
     () => pageAnnotations.filter((annotation) => groupSelection.includes(annotation.id)),
@@ -204,6 +215,106 @@ export function AdminFormWorkspace({
   useEffect(() => () => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
   }, [pdfUrl]);
+
+  useEffect(() => {
+    if (!isPublic) return;
+    let cancelled = false;
+    readAnnotationDraft().then((draft) => {
+      if (cancelled) return;
+      if (draft) {
+        pdfBlobRef.current = draft.pdf;
+        if (draft.pdf) setPdfUrl(URL.createObjectURL(draft.pdf));
+        setPdfName(draft.pdfName);
+        resetAnnotations(draft.document.annotations);
+        setTemplateMetadata(draft.document.metadata);
+        setPageIndex(draft.pageIndex);
+        setZoom(draft.zoom);
+        setShowBoxLabels(draft.showBoxLabels);
+        setShowAnnotationText(draft.showAnnotationText);
+        setSelectedId(draft.document.annotations[0]?.id ?? null);
+        setLocalSaveStatus("Saved locally");
+      } else setLocalSaveStatus("");
+    }).catch(() => {
+      if (!cancelled) setLocalSaveStatus("Could not restore local workspace");
+    }).finally(() => {
+      if (!cancelled) setDraftReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [isPublic, resetAnnotations]);
+
+  useEffect(() => {
+    if (!isPublic || !draftReady || clearingDraft) return;
+    if (!pdfBlobRef.current && !annotations.length) return;
+    const revision = ++draftRevisionRef.current;
+    const draft: AnnotationDraft = {
+      version: 1, pdf: pdfBlobRef.current, pdfName,
+      document: { metadata: templateMetadata, annotations },
+      pageIndex, zoom, showBoxLabels, showAnnotationText, updatedAt: Date.now(),
+    };
+    latestDraftRef.current = draft;
+    draftTimerRef.current = setTimeout(() => {
+      setLocalSaveStatus("Saving locally…");
+      writeAnnotationDraft(draft).then(() => {
+        if (draftRevisionRef.current === revision) setLocalSaveStatus("Saved locally");
+      }).catch(() => {
+        if (draftRevisionRef.current === revision) setLocalSaveStatus("Local save failed — download a backup");
+      });
+    }, 400);
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+  }, [isPublic, draftReady, clearingDraft, annotations, templateMetadata, pdfName, pdfUrl, pageIndex, zoom, showBoxLabels, showAnnotationText]);
+
+  useEffect(() => {
+    if (!isPublic) return;
+    function flushDraft() {
+      if (!latestDraftRef.current) return;
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+      void writeAnnotationDraft(latestDraftRef.current).catch(() => {});
+    }
+    function onVisibilityChange() {
+      if (window.document.visibilityState === "hidden") flushDraft();
+    }
+    window.addEventListener("pagehide", flushDraft);
+    window.document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      flushDraft();
+      window.removeEventListener("pagehide", flushDraft);
+      window.document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [isPublic]);
+
+  async function clearWorkspace() {
+    if (!isPublic || !draftReady || clearingDraft) return;
+    setClearingDraft(true);
+    ++draftRevisionRef.current;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    const previousDraft = latestDraftRef.current;
+    latestDraftRef.current = null;
+    try {
+      await deleteAnnotationDraft();
+      pdfBlobRef.current = null;
+      setPdfUrl(null);
+      setPdfName("");
+      resetAnnotations([]);
+      setTemplateMetadata({ schemaVersion: "1.1", id: "untitled-template", name: "Untitled template", source: "" });
+      setPageIndex(0);
+      setZoom(1);
+      setPageSize({ width: 0, height: 0 });
+      setSelectedId(null);
+      setGroupSelection([]);
+      setTemplateJsonText("");
+      setTool("select");
+      setSaveError("");
+      boxClipboardRef.current = [];
+      setLocalSaveStatus("");
+    } catch {
+      latestDraftRef.current = previousDraft;
+      setLocalSaveStatus("Could not clear local workspace");
+    } finally {
+      setClearingDraft(false);
+    }
+  }
 
   function toggleTheme() {
     window.localStorage.setItem(ANNOTATION_THEME_KEY, darkTheme ? "light" : "dark");
@@ -356,7 +467,7 @@ export function AdminFormWorkspace({
     setSaveError("");
   }
 
-  function pointFromEvent(event: React.PointerEvent<SVGSVGElement | SVGRectElement | SVGCircleElement>): Point {
+  function pointFromEvent(event: React.MouseEvent<SVGSVGElement | SVGRectElement | SVGCircleElement>): Point {
     const svg = (event.currentTarget instanceof SVGSVGElement
       ? event.currentTarget
       : event.currentTarget.ownerSVGElement)!;
@@ -376,7 +487,8 @@ export function AdminFormWorkspace({
       return;
     }
     setSelectedId(annotation.id);
-    if (tool !== "select") return;
+    if (tool !== "select" && !(isPublic && tool === "draw")) return;
+    if (isPublic) setTool("select");
     beginHistory();
     event.currentTarget.setPointerCapture(event.pointerId);
     interactionRef.current = {
@@ -472,7 +584,7 @@ export function AdminFormWorkspace({
       setSelectionStart(point);
       setSelectionCurrent(point);
       if (!event.shiftKey) setGroupSelection([]);
-    } else if (tool === "draw") {
+    } else if (tool === "draw" || (isPublic && tool === "select")) {
       setDrawStart(point);
       setDrawCurrent(point);
     } else {
@@ -574,7 +686,22 @@ export function AdminFormWorkspace({
   function exportTemplate() {
     if (!templateDraft) return;
     if (isPublic) {
-      if (!document || !annotations.length || validationIssues.length) return;
+      if (!document || !annotations.length || validationIssues.length) {
+        setHighlightValidation(true);
+        setSidebarSection("edit");
+        const firstIssue = validationIssues[0];
+        if (firstIssue && document) {
+          setPageIndex(Math.min(Math.max(0, firstIssue.page - 1), document.numPages - 1));
+          setSelectedId(firstIssue.annotationId);
+          setGroupSelection([]);
+          setTool("select");
+        }
+        requestAnimationFrame(() => {
+          validationListRef.current?.scrollIntoView({ block: "nearest" });
+          validationListRef.current?.focus();
+        });
+        return;
+      }
     }
     const template = getCurrentTemplateDocument(templateDraft, templateMetadata, annotations, pdfName, document?.numPages);
     downloadBlob(new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" }), "template.json");
@@ -674,6 +801,7 @@ export function AdminFormWorkspace({
       if (current) URL.revokeObjectURL(current);
       return URL.createObjectURL(file);
     });
+    pdfBlobRef.current = file;
     setPdfName(file.name);
     setSidebarSection("edit");
     setPageIndex(0);
@@ -869,6 +997,12 @@ export function AdminFormWorkspace({
           <strong>{workspaceTitle}</strong>
           <span>{pdfName || uploadPrompt} · {annotations.length} annotation{annotations.length === 1 ? "" : "s"} · {status}</span>
         </div>
+        {isPublic && <div className="local-draft-controls">
+          <span role="status" aria-live="polite">{localSaveStatus}</span>
+          <button type="button" disabled={!draftReady || clearingDraft || (!pdfUrl && !annotations.length)} onClick={() => void clearWorkspace()}>
+            <Trash2 size={14} /> Clear workspace
+          </button>
+        </div>}
         <button
           className="workspace-theme-toggle"
           type="button"
@@ -880,7 +1014,8 @@ export function AdminFormWorkspace({
         </button>
       </header>
 
-      <div className={`editor-grid ${pagesExpanded ? "" : "pages-collapsed"} ${isPublic && !document ? "awaiting-pdf" : ""}`}>
+      {isPublic && !draftReady && <div className="workspace-restore-overlay" role="status"><span className="spinner" /> Restoring workspace…</div>}
+      <div inert={isPublic && (!draftReady || clearingDraft)} className={`editor-grid ${pagesExpanded ? "" : "pages-collapsed"} ${isPublic && !document ? "awaiting-pdf" : ""}`}>
         <aside className="side-panel document-pages-panel">
           <div className="panel-head document-pages-heading">
             <div className="document-pages-title" aria-hidden={!pagesExpanded}>
@@ -966,7 +1101,7 @@ export function AdminFormWorkspace({
                   <span className="group-selection-count">{groupAnnotations.length} selected</span>
                 </>
               )}
-              <button className={`tool-button ${tool === "draw" ? "active" : ""}`} title="Draw annotation" onClick={() => setTool("draw")}>
+              <button className={`tool-button ${tool === "draw" ? "active" : ""}`} type="button" aria-label="Add annotation" aria-pressed={tool === "draw"} title="Add annotation: double-click the page or drag to draw a box" onClick={() => setTool("draw")}>
                 <Plus size={16} />
               </button>
               <button
@@ -1060,6 +1195,24 @@ export function AdminFormWorkspace({
                     onPointerMove={pointerMove}
                     onPointerUp={pointerUp}
                     onPointerCancel={pointerUp}
+                    onDoubleClick={(event) => {
+                      if (!isPublic || tool === "transform-all" || event.target !== event.currentTarget) return;
+                      event.preventDefault();
+                      const point = pointFromEvent(event);
+                      const x = Math.min(840, Math.round(point.x * 1000));
+                      const y = Math.min(950, Math.round(point.y * 1000));
+                      const annotation = createAnnotation({
+                        bbox: [x, y, x + 160, y + 50],
+                        page: pageIndex + 1,
+                        readingOrder: getNextReadingOrder(annotations),
+                      });
+                      setAnnotations((current) => [...current, annotation]);
+                      setSelectedId(annotation.id);
+                      setTool("select");
+                      setSidebarSection("edit");
+                      setSaveState("idle");
+                      setSaveError("");
+                    }}
                     style={{ cursor: tool === "draw" || tool === "transform-all" ? "crosshair" : "default" }}
                   >
                     {pageAnnotations.map((annotation) => {
@@ -1082,7 +1235,14 @@ export function AdminFormWorkspace({
                             width={box.width * pageSize.width}
                             height={box.height * pageSize.height}
                             className={`admin-annotation-box ${annotation.id === selectedId || (tool === "transform-all" && groupSelection.includes(annotation.id)) ? "active" : ""} ${selected?.questionId && annotation.questionId === selected.questionId && annotation.id !== selected.id ? "linked" : ""}`}
-                            style={{ ...annotationColorStyle(annotation.label), cursor: tool === "select" ? "move" : tool === "draw" ? "crosshair" : "pointer" }}
+                            style={{
+                              ...annotationColorStyle(annotation.label),
+                              ...(isPublic && highlightValidation && invalidAnnotationIds.has(annotation.id) ? {
+                                "--annotation-stroke": "#dc2626",
+                                "--annotation-fill": "rgba(220, 38, 38, .25)",
+                              } as CSSProperties : {}),
+                              cursor: tool === "select" || (isPublic && tool === "draw") ? "move" : tool === "draw" ? "crosshair" : "pointer",
+                            }}
                             onPointerDown={(event) => startMove(event, annotation)}
                             onDoubleClick={(event) => {
                               event.stopPropagation();
@@ -1582,8 +1742,9 @@ export function AdminFormWorkspace({
           {isPublic && isTemplateMode && (
             <div className="panel-section">
               {(!annotations.length || validationIssues.length > 0) && (
-                <div className="annotation-validation" role="alert">
+                <div className="annotation-validation" role="alert" ref={validationListRef} tabIndex={-1}>
                   <strong>{!annotations.length ? "Add an annotation before downloading." : `${new Set(validationIssues.map((issue) => issue.annotationId)).size} annotation(s) need attention`}</strong>
+                  {highlightValidation && annotations.length > 0 && <p>Download unavailable. Highlighted boxes need correction. Select an issue below to review it.</p>}
                   <div className="annotation-validation-list">
                     {validationIssues.map((issue, index) => (
                       <button type="button" key={`${issue.annotationId}-${index}`} onClick={() => {
@@ -1603,7 +1764,7 @@ export function AdminFormWorkspace({
                 </div>
               )}
               <button className="button button-primary admin-approve-button" type="button" onClick={exportTemplate}
-                disabled={!document || !annotations.length || validationIssues.length > 0}
+                aria-disabled={!document || !annotations.length || validationIssues.length > 0}
                 title={!annotations.length ? "Add an annotation to download" : validationIssues.length ? "Fix annotation issues to download" : "Download annotations"}>
                 <Download size={16} />
                 Download

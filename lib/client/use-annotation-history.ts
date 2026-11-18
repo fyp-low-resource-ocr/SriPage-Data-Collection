@@ -3,9 +3,10 @@
 import { useCallback, useReducer, type SetStateAction } from "react";
 
 type History<T> = { present: T; past: T[]; future: T[]; transaction: T | null };
-type Action<T> = { type: "set"; value: SetStateAction<T> } | { type: "undo" | "redo" | "begin" | "end" };
+type Action<T> = { type: "set"; value: SetStateAction<T> } | { type: "reset"; value: T } | { type: "undo" | "redo" | "begin" | "end" };
 
 export function reduceHistory<T>(state: History<T>, action: Action<T>): History<T> {
+  if (action.type === "reset") return { present: action.value, past: [], future: [], transaction: null };
   if (action.type === "begin") return { ...state, transaction: state.transaction ?? state.present };
   if (action.type === "end") {
     if (state.transaction === null) return state;
@@ -28,9 +29,10 @@ export function reduceHistory<T>(state: History<T>, action: Action<T>): History<
 export function useAnnotationHistory<T>(initial: () => T) {
   const [state, dispatch] = useReducer(reduceHistory<T>, undefined, () => ({ present: initial(), past: [], future: [], transaction: null }));
   const set = useCallback((value: SetStateAction<T>) => dispatch({ type: "set", value }), []);
+  const reset = useCallback((value: T) => dispatch({ type: "reset", value }), []);
   const undo = useCallback(() => dispatch({ type: "undo" }), []);
   const redo = useCallback(() => dispatch({ type: "redo" }), []);
   const begin = useCallback(() => dispatch({ type: "begin" }), []);
   const end = useCallback(() => dispatch({ type: "end" }), []);
-  return { value: state.present, set, undo, redo, begin, end, canUndo: state.past.length > 0, canRedo: state.future.length > 0 };
+  return { value: state.present, set, reset, undo, redo, begin, end, canUndo: state.past.length > 0, canRedo: state.future.length > 0 };
 }
