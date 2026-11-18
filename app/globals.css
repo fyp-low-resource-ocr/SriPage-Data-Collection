@@ -21,7 +21,7 @@ body {
   margin: 0;
   background: var(--wash);
   color: var(--ink);
-  font-family: var(--font-geist), var(--font-sinhala), "Segoe UI", sans-serif;
+  font-family: var(--font-geist), var(--font-sinhala), var(--font-tamil), "Segoe UI", sans-serif;
 }
 
 button, input, select, textarea { font: inherit; }
@@ -1251,3 +1251,67 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .annotation-validation-highlight { fill: none; stroke: #e24a4a; stroke-width: 2; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; }
 .annotation-validation p { margin: 8px 0; line-height: 1.5; }
 .workspace-public .admin-approve-button[aria-disabled="true"] { opacity: .45; cursor: help; transform: none; }
+
+.field-label-with-help { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.field .field-label-with-help label { margin-bottom: 0; }
+.field-help { display: inline-flex; position: relative; flex-shrink: 0; }
+.field-help-trigger { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); cursor: help; }
+.field-help-trigger:hover, .field-help-trigger:focus-visible { color: var(--ink); background: var(--mint); }
+.field-help-tooltip { position: absolute; right: 0; top: 100%; z-index: 80; width: 235px; max-width: calc(100vw - 48px); padding: 11px 13px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 24px rgba(0,0,0,.16); font-size: 12px; font-weight: 400; line-height: 1.6; text-align: left; }
+.field-help-tooltip[hidden] { display: none; }
+
+.field-help-tooltip {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-5px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(.22, 1, .36, 1), visibility 0s linear 180ms;
+}
+.field-help-tooltip.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-help-tooltip { transition: none; transform: none; }
+}
+
+.toolbar-tooltip-anchor { display: inline-flex; align-items: center; flex-shrink: 0; }
+.workspace-bar > .toolbar-tooltip-anchor { margin-left: auto; }
+.workspace-bar .local-draft-controls + .toolbar-tooltip-anchor { margin-left: 0; }
+.toolbar-icon-tooltip {
+  position: fixed;
+  z-index: 200;
+  width: max-content;
+  max-width: min(240px, calc(100vw - 24px));
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 6px 22px rgba(0,0,0,.18);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 220ms ease, visibility 0s linear 180ms;
+}
+.toolbar-icon-tooltip.is-open { opacity: 1; visibility: visible; transform: translateY(0); transition-delay: 0s; }
+@media (prefers-reduced-motion: reduce) { .toolbar-icon-tooltip { transition: none; transform: none; } }
+
+/* One fixed font per annotation language, with script fallbacks for mixed text. */
+:is(.admin-selected-textarea, .annotation-language-text, .custom-select-language-icon):lang(si) {
+  font-family: var(--font-sinhala), var(--font-geist), var(--font-tamil), sans-serif;
+}
+:is(.admin-selected-textarea, .annotation-language-text, .custom-select-language-icon):lang(ta) {
+  font-family: var(--font-tamil), var(--font-geist), var(--font-sinhala), sans-serif;
+}
+:is(.admin-selected-textarea, .annotation-language-text, .custom-select-language-icon):lang(en) {
+  font-family: var(--font-geist), var(--font-sinhala), var(--font-tamil), sans-serif;
+}
