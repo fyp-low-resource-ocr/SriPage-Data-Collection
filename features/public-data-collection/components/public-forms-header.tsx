@@ -1,19 +1,19 @@
 import { ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 export function PublicFormsHeader() {
   return (
     <header className="public-form-header">
-      <div className="public-form-brand">
+      <Link href="/" className="public-form-brand" aria-label="Sri Page home">
         <span className="public-form-brand-mark"><ShieldCheck size={20} /></span>
         <span>
-          <strong>SriDoc Forms</strong>
-          <span>Public document support</span>
+          <strong>Sri Page</strong>
         </span>
-      </div>
-      <div className="public-form-status">
-        <span className="status-dot" />
-        Open for public use
-      </div>
+      </Link>
+      <nav className="public-form-nav" aria-label="Main navigation">
+        <Link href="/public-forms">Generate sample form details</Link>
+        <Link href="/annotate">Annotate a PDF</Link>
+      </nav>
     </header>
   );
 }

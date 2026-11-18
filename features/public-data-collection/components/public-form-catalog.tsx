@@ -9,15 +9,12 @@ export function PublicFormCatalog({ categories }: { categories: DataCollectionCa
       <PublicFormsHeader />
       <section className="public-catalog-layout" aria-label="Public form categories">
         <div className="public-catalog-intro">
-          <span className="eyebrow">Public service forms</span>
-          <h1>Choose a category to get sample Sinhala details.</h1>
-          <p>
-            Pick a form below to prepare clear sample entries without using real personal information.
-          </p>
+          <h1>Forms</h1>
+          <p>Choose a form to prepare sample Sinhala details.</p>
         </div>
 
         {categories.map(({ category, forms }) => (
-          <div className="public-category-section" key={category.id}>
+          <div className="public-category-section" key={category.id} data-category={category.id}>
             <div className="public-category-heading">
               <h2>{category.nameEn}</h2>
               <span lang="si">{category.nameSi}</span>

@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, BoxSelect, Check, Copy, Download, Eye, EyeOff, FileText, Moon, MousePointer2, Plus, Save, Sun, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, BoxSelect, Check, ChevronLeft, Copy, Download, Eye, EyeOff, FileText, Moon, MousePointer2, Plus, Save, Sun, Trash2, UploadCloud, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
+import { CustomSelect } from "./custom-select";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import {
   SRI_PAGE_LANGUAGES,
@@ -75,6 +76,12 @@ function annotationColorStyle(label: SriPageLabel): CSSProperties {
   } as CSSProperties;
 }
 
+const LANGUAGE_DISPLAY: Record<SriPageLanguage, { label: string; symbol: string }> = {
+  si: { label: "Sinhala · සිංහල", symbol: "සි" },
+  ta: { label: "Tamil · தமிழ்", symbol: "த" },
+  en: { label: "English", symbol: "A" },
+};
+
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.2;
 const ZOOM_STEP = 0.15;
@@ -101,14 +108,20 @@ export function AdminFormWorkspace({
   templateDraft,
   formDefinition,
   correctionTemplates = [],
+  mode = "admin",
 }: {
   savedForm?: SavedGeneratedFormDetails;
   templateDraft?: TemplateDraft;
   formDefinition?: DataCollectionForm;
   correctionTemplates?: string[];
+  mode?: "admin" | "public";
 }) {
+  const [pagesExpanded, setPagesExpanded] = useState(true);
+  const [draggingPdf, setDraggingPdf] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const isPublic = mode === "public";
   const isTemplateMode = Boolean(templateDraft);
-  const canSaveTemplate = isTemplateMode && !templateDraft?.standalone;
+  const canSaveTemplate = !isPublic && isTemplateMode && !templateDraft?.standalone;
   const initialAnnotationsJson = templateDraft?.annotationsJson ?? savedForm?.annotationsJson ?? null;
   const storedAnnotations = initialAnnotationsJson?.annotations;
   const [annotations, setAnnotations] = useState<AdminAnnotation[]>(() => storedAnnotations ?? []);
@@ -125,7 +138,7 @@ export function AdminFormWorkspace({
     [annotations, formDefinition, templateDraft?.standalone, templateMetadata],
   );
   const [templateJsonText, setTemplateJsonText] = useState("");
-  const [formCorrectionMode, setFormCorrectionMode] = useState(true);
+  const [formCorrectionMode, setFormCorrectionMode] = useState(!isPublic);
   const [selectedCorrectionTemplate, setSelectedCorrectionTemplate] = useState("");
   const [correctionFormNumber, setCorrectionFormNumber] = useState("");
   const [correctionVariant, setCorrectionVariant] = useState("");
@@ -445,6 +458,7 @@ export function AdminFormWorkspace({
   }
 
   async function approveAnnotations() {
+    if (isPublic) return;
     setSaveState("saving");
     setSaveError("");
     try {
@@ -465,7 +479,7 @@ export function AdminFormWorkspace({
   }
 
   async function saveTemplate() {
-    if (!templateDraft) return;
+    if (isPublic || !templateDraft) return;
     setSaveState("saving");
     setSaveError("");
     try {
@@ -536,6 +550,7 @@ export function AdminFormWorkspace({
   }, []);
 
   useEffect(() => {
+    if (isPublic) return;
     const formNumber = window.localStorage.getItem(CORRECTION_FORM_NUMBER_KEY) ?? "";
     const variant = window.localStorage.getItem(CORRECTION_VARIANT_KEY) ?? "";
     const restoreTimer = window.setTimeout(() => {
@@ -545,7 +560,7 @@ export function AdminFormWorkspace({
       if (fileName && correctionTemplates.includes(fileName)) void loadCorrectionTemplate(fileName);
     }, 0);
     return () => window.clearTimeout(restoreTimer);
-  }, [correctionTemplates, loadCorrectionTemplate]);
+  }, [correctionTemplates, isPublic, loadCorrectionTemplate]);
 
   function selectCorrectionByParts(formNumber: string, variant: string) {
     setCorrectionFormNumber(formNumber);
@@ -750,10 +765,6 @@ export function AdminFormWorkspace({
   const drawBox = drawStart && drawCurrent ? normalizeSriPageBBox(bboxFromPoints(drawStart, drawCurrent)) : null;
   const workspaceTitle = templateDraft?.standalone ? "Annotation editor" : templateDraft?.formName ?? savedForm?.uniqueFormName ?? "Annotation editor";
   const uploadPrompt = isTemplateMode ? "Upload empty PDF for template review" : "Upload filled PDF for review";
-  const emptyStateTitle = isTemplateMode ? "No PDF loaded" : "Upload the filled PDF for this review";
-  const emptyStateCopy = isTemplateMode
-    ? "A PDF is optional. You can review imported annotations, export the JSON, or upload a PDF to edit boxes visually."
-    : "The annotations are loaded from Firestore. The uploaded filled PDF stays in this browser session and is not stored on the server.";
   const saveButtonLabel = isTemplateMode
     ? saveState === "saving" ? "Saving template..." : saveState === "saved" ? "Template saved" : "Save template"
     : saveState === "saving" ? "Saving changes..." : saveState === "saved" ? "Saved and approved" : "Save changes and approve";
@@ -765,9 +776,20 @@ export function AdminFormWorkspace({
     : "";
 
   return (
-    <div className={`workspace ${darkTheme ? "workspace-dark" : ""}`}>
+    <div className={`workspace ${darkTheme ? "workspace-dark" : ""} ${isPublic ? "workspace-public" : ""}`}>
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        aria-label="Choose a PDF to annotate"
+        hidden
+        onChange={(event) => {
+          loadPdfFile(event.target.files?.[0] ?? null);
+          event.target.value = "";
+        }}
+      />
       <header className="workspace-bar">
-        <Link href="/admin" className="tool-button" style={{ color: "white" }} aria-label="Back to admin">
+        <Link href={isPublic ? "/" : "/admin"} className="tool-button" style={{ color: "white" }} aria-label={isPublic ? "Back to home" : "Back to admin"}>
           <ArrowLeft size={17} />
         </Link>
         <div className="workspace-title">
@@ -782,23 +804,29 @@ export function AdminFormWorkspace({
           title={`Switch to ${darkTheme ? "light" : "dark"} theme`}
         >
           {darkTheme ? <Sun size={16} /> : <Moon size={16} />}
-          <span>{darkTheme ? "Light" : "Dark"}</span>
         </button>
       </header>
 
-      <div className="editor-grid">
-        <aside className="side-panel">
-          <div className="panel-head">
-            <h2>Document pages</h2>
-            <p>{document ? `${document.numPages} page${document.numPages === 1 ? "" : "s"}` : "Upload a PDF to preview pages."}</p>
+      <div className={`editor-grid ${pagesExpanded ? "" : "pages-collapsed"}`}>
+        <aside className="side-panel document-pages-panel">
+          <div className="panel-head document-pages-heading">
+            <div className="document-pages-title" aria-hidden={!pagesExpanded}>
+              <h2>Document pages</h2>
+              <p>{document ? `${document.numPages} page${document.numPages === 1 ? "" : "s"}` : "Upload a PDF to preview pages."}</p>
+            </div>
+            <button
+              className="tool-button"
+              type="button"
+              onClick={() => setPagesExpanded((current) => !current)}
+              aria-expanded={pagesExpanded}
+              aria-controls="document-pages-content"
+              aria-label={`${pagesExpanded ? "Collapse" : "Expand"} document pages`}
+              title={`${pagesExpanded ? "Collapse" : "Expand"} document pages`}
+            >
+              <ChevronLeft size={16} className="document-pages-chevron" />
+            </button>
           </div>
-          {isTemplateMode && (
-            <label className="admin-side-upload-button">
-              <UploadCloud size={15} />
-              Upload empty PDF
-              <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
-            </label>
-          )}
+          <div id="document-pages-content" inert={!pagesExpanded} aria-hidden={!pagesExpanded}>
           {document && (
             <PdfThumbnails
               document={document}
@@ -810,18 +838,13 @@ export function AdminFormWorkspace({
               }}
             />
           )}
+          </div>
         </aside>
 
         <section className="canvas-column">
           <div className="canvas-toolbar">
             <div className="tool-group">
-              <span className="admin-form-badge"><FileText size={14} /> Saved annotations</span>
-              {isTemplateMode && (
-                <label className="tool-button admin-pdf-toolbar-upload" title="Upload empty PDF">
-                  <UploadCloud size={15} />
-                  <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
-                </label>
-              )}
+              {!isPublic && <span className="admin-form-badge"><FileText size={14} /> Saved annotations</span>}
               <button className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move (V); use arrow keys to nudge" aria-keyshortcuts="V ArrowLeft ArrowRight ArrowUp ArrowDown" onClick={() => setTool("select")}>
                 <MousePointer2 size={15} />
               </button>
@@ -905,15 +928,34 @@ export function AdminFormWorkspace({
               </button>
             </div>
           </div>
-          <div className="canvas-scroll">
+          <div
+            className={`canvas-scroll ${draggingPdf ? "pdf-drag-active" : ""}`}
+            onDragOver={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+              setDraggingPdf(true);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDraggingPdf(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDraggingPdf(false);
+              loadPdfFile(event.dataTransfer.files[0] ?? null);
+            }}
+          >
             {!pdfUrl ? (
-              <div className="admin-pdf-upload-empty">
-                <FileText size={32} />
-                <div>
-                  <h2>{emptyStateTitle}</h2>
-                  <p>{emptyStateCopy}</p>
+              <div className="admin-pdf-upload-empty pdf-upload-zone">
+                <div className="pdf-upload-icon" aria-hidden="true">
+                  <FileText size={40} strokeWidth={1.4} />
+                  <span><Plus size={16} /></span>
                 </div>
-                <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
+                <button className="button button-primary" type="button" onClick={() => pdfInputRef.current?.click()}>
+                  <UploadCloud size={18} />
+                  Upload PDF
+                </button>
+                <span className="pdf-upload-hint">or drag and drop your PDF here</span>
               </div>
             ) : error ? (
               <div className="admin-pdf-upload-empty">
@@ -922,7 +964,10 @@ export function AdminFormWorkspace({
                   <h2>{error}</h2>
                   <p>Upload the empty PDF for this template to continue editing the saved annotations.</p>
                 </div>
-                <input type="file" accept="application/pdf,.pdf" onChange={(event) => loadPdfFile(event.target.files?.[0] ?? null)} />
+                <button className="button button-primary" type="button" onClick={() => pdfInputRef.current?.click()}>
+                  <UploadCloud size={18} />
+                  Upload PDF
+                </button>
               </div>
             ) : document ? (
               <div className="page-stage">
@@ -1097,10 +1142,11 @@ export function AdminFormWorkspace({
         </section>
 
         <aside className="side-panel right">
-          <div className="panel-head">
+          {(!isPublic || document) && <>
+          {!isPublic && <div className="panel-head">
             <h2>{isTemplateMode ? "Template text" : "Stored text"}</h2>
             <p>{isTemplateMode ? "Text and bounding boxes loaded from the uploaded annotation JSON." : "Text and bounding boxes loaded from the saved formDetails document."}</p>
-          </div>
+          </div>}
 
           {tool === "transform-all" && (
             <div className="instruction">
@@ -1108,10 +1154,10 @@ export function AdminFormWorkspace({
             </div>
           )}
 
-          <div className="panel-section">
+          {!isPublic && <div className="panel-section">
             <h3>Review actions</h3>
             <div className="form-grid">
-              {(canSaveTemplate || !isTemplateMode) && (
+              {!isPublic && (canSaveTemplate || !isTemplateMode) && (
                 <button className="button button-primary admin-approve-button" type="button" onClick={isTemplateMode ? saveTemplate : approveAnnotations} disabled={saveState === "saving"}>
                   {saveState === "saving" ? <span className="spinner" /> : saveState === "saved" ? <Check size={16} /> : <Save size={16} />}
                   {saveButtonLabel}
@@ -1125,9 +1171,9 @@ export function AdminFormWorkspace({
               )}
               {saveState === "saved" && <div className="admin-save-note">{saveSuccessMessage}</div>}
             </div>
-          </div>
+          </div>}
 
-          {activeFormDefinition && (
+          {!isPublic && activeFormDefinition && (
             <div className="panel-section">
               <h3>LLM sample values</h3>
               <div className="form-grid">
@@ -1198,8 +1244,8 @@ export function AdminFormWorkspace({
           {isTemplateMode && (
             <div className="panel-section">
               <div className="admin-correction-heading">
-                <h3>Load template</h3>
-                <label className="toggle admin-correction-toggle" aria-label="Enable form correction mode">
+                <h3>{isPublic ? "Load annotations" : "Load template"}</h3>
+                {!isPublic && <label className="toggle admin-correction-toggle" aria-label="Enable form correction mode">
                   <input
                     type="checkbox"
                     checked={formCorrectionMode}
@@ -1207,10 +1253,10 @@ export function AdminFormWorkspace({
                   />
                   <span className="toggle-track" aria-hidden="true" />
                   <span>Form correction</span>
-                </label>
+                </label>}
               </div>
               <div className="form-grid">
-                {formCorrectionMode && (
+                {!isPublic && formCorrectionMode && (
                   <>
                     <div className="field">
                       <label htmlFor="admin-correction-template">Annotated form</label>
@@ -1278,7 +1324,7 @@ export function AdminFormWorkspace({
                   value={templateJsonText}
                   onChange={(event) => setTemplateJsonText(event.target.value)}
                   placeholder={'{"metadata":{"schemaVersion":"1.1",...},"annotations":[]}'}
-                  aria-label="Template JSON string"
+                  aria-label={isPublic ? "Annotation JSON" : "Template JSON string"}
                   spellCheck={false}
                 />
                 <button
@@ -1287,7 +1333,7 @@ export function AdminFormWorkspace({
                   onClick={loadTemplateString}
                   disabled={!templateJsonText.trim()}
                 >
-                  Load template string
+                  {isPublic ? "Load annotations" : "Load template string"}
                 </button>
                 <small>This replaces the annotations currently open in the editor.</small>
               </div>
@@ -1310,14 +1356,13 @@ export function AdminFormWorkspace({
                 </div>
                 <div className="field">
                   <label htmlFor="admin-annotation-label">Label</label>
-                  <select
+                  <CustomSelect
                     id="admin-annotation-label"
-                    className="select"
+                    native={!isPublic}
                     value={selected.label}
-                    onChange={(event) => updateAnnotation(selected.id, { label: event.target.value as SriPageLabel })}
-                  >
-                    {LABELS.map((label) => <option key={label} value={label}>{label}</option>)}
-                  </select>
+                    options={LABELS.map((label) => ({ value: label, label, color: LABEL_COLORS[label].stroke }))}
+                    onChange={(value) => updateAnnotation(selected.id, { label: value as SriPageLabel })}
+                  />
                 </div>
                 <div className="field">
                   <label htmlFor="admin-annotation-reading-order">Reading order</label>
@@ -1342,15 +1387,13 @@ export function AdminFormWorkspace({
                 </div>
                 <div className="field">
                   <label htmlFor="admin-annotation-language">Language</label>
-                  <select
+                  <CustomSelect
                     id="admin-annotation-language"
-                    className="select"
+                    native={!isPublic}
                     value={selected.language ?? ""}
-                    onChange={(event) => updateAnnotation(selected.id, { language: (event.target.value || undefined) as SriPageLanguage | undefined })}
-                  >
-                    <option value="">Not specified</option>
-                    {SRI_PAGE_LANGUAGES.map((language) => <option key={language} value={language}>{language}</option>)}
-                  </select>
+                    options={[{ value: "", label: "Not specified" }, ...SRI_PAGE_LANGUAGES.map((language) => ({ value: language, label: isPublic ? LANGUAGE_DISPLAY[language].label : language, symbol: LANGUAGE_DISPLAY[language].symbol, lang: language }))]}
+                    onChange={(value) => updateAnnotation(selected.id, { language: (value || undefined) as SriPageLanguage | undefined })}
+                  />
                 </div>
                 <dl className="admin-annotation-meta">
                   <div><dt>Page</dt><dd>{selected.page}</dd></div>
@@ -1382,7 +1425,6 @@ export function AdminFormWorkspace({
               </div>
             </div>
           )}
-          {saveError && <div className="error public-save-error">{saveError}</div>}
 
           <div className="panel-section">
             <h3>Page {pageIndex + 1} annotations ({pageAnnotations.length})</h3>
@@ -1407,6 +1449,16 @@ export function AdminFormWorkspace({
               {!pageAnnotations.length && <p style={{ color: "var(--muted)", fontSize: 11 }}>No annotations on this page.</p>}
             </div>
           </div>
+          {isPublic && isTemplateMode && (
+            <div className="panel-section">
+              <button className="button button-primary admin-approve-button" type="button" onClick={exportTemplate}>
+                <Download size={16} />
+                Download
+              </button>
+            </div>
+          )}
+          </>}
+          {saveError && <div className="error public-save-error">{saveError}</div>}
         </aside>
       </div>
     </div>
