@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useAnnotationHistory } from "@/lib/client/use-annotation-history";
 import { validateAnnotations } from "@/lib/annotation-validation";
 import { readAnnotationDraft, writeAnnotationDraft, deleteAnnotationDraft, type AnnotationDraft } from "@/lib/client/annotation-draft-store";
+import { AnnotationFieldLabel, FieldHelp } from "./field-help";
+import { TooltipButton } from "./tooltip-button";
 import { CustomSelect } from "./custom-select";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import {
@@ -607,6 +609,7 @@ export function AdminFormWorkspace({
           bbox,
           page: pageIndex + 1,
           readingOrder: getNextReadingOrder(annotations),
+          ...(isPublic ? { language: "si" as const } : {}),
         });
 
         setAnnotations((current) => [...current, annotation]);
@@ -999,11 +1002,11 @@ export function AdminFormWorkspace({
         </div>
         {isPublic && <div className="local-draft-controls">
           <span role="status" aria-live="polite">{localSaveStatus}</span>
-          <button type="button" disabled={!draftReady || clearingDraft || (!pdfUrl && !annotations.length)} onClick={() => void clearWorkspace()}>
+          <button type="button" title="Remove this PDF and annotations from the browser, including the saved local draft." disabled={!draftReady || clearingDraft || (!pdfUrl && !annotations.length)} onClick={() => void clearWorkspace()}>
             <Trash2 size={14} /> Clear workspace
           </button>
         </div>}
-        <button
+        <TooltipButton
           className="workspace-theme-toggle"
           type="button"
           onClick={toggleTheme}
@@ -1011,7 +1014,7 @@ export function AdminFormWorkspace({
           title={`Switch to ${darkTheme ? "light" : "dark"} theme`}
         >
           {darkTheme ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+        </TooltipButton>
       </header>
 
       {isPublic && !draftReady && <div className="workspace-restore-overlay" role="status"><span className="spinner" /> Restoring workspace…</div>}
@@ -1053,19 +1056,19 @@ export function AdminFormWorkspace({
           <div className="canvas-toolbar">
             <div className="tool-group">
               {!isPublic && <span className="admin-form-badge"><FileText size={14} /> Saved annotations</span>}
-              <button className="tool-button" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled={!canUndo} onClick={() => { undo(); setSaveState("idle"); setSaveError(""); }}>
+              <TooltipButton className="tool-button" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled={!canUndo} onClick={() => { undo(); setSaveState("idle"); setSaveError(""); }}>
                 <Undo2 size={16} />
-              </button>
-              <button className="tool-button" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled={!canRedo} onClick={() => { redo(); setSaveState("idle"); setSaveError(""); }}>
+              </TooltipButton>
+              <TooltipButton className="tool-button" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled={!canRedo} onClick={() => { redo(); setSaveState("idle"); setSaveError(""); }}>
                 <Redo2 size={16} />
-              </button>
-              <button className="tool-button" type="button" title="Duplicate selected box" aria-label="Duplicate selected box" disabled={!selected} onClick={duplicateSelectedAnnotation}>
+              </TooltipButton>
+              <TooltipButton className="tool-button" type="button" title="Duplicate selected box. Use Ctrl/Cmd+C and Ctrl/Cmd+V to copy and paste boxes." aria-label="Duplicate selected box" disabled={!selected} onClick={duplicateSelectedAnnotation}>
                 <Copy size={16} />
-              </button>
-              <button className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move (V); use arrow keys to nudge" aria-keyshortcuts="V ArrowLeft ArrowRight ArrowUp ArrowDown" onClick={() => setTool("select")}>
+              </TooltipButton>
+              <TooltipButton className={`tool-button ${tool === "select" ? "active" : ""}`} title="Select and move (V); use arrow keys to nudge" aria-keyshortcuts="V ArrowLeft ArrowRight ArrowUp ArrowDown" onClick={() => setTool("select")}>
                 <MousePointer2 size={15} />
-              </button>
-              <button
+              </TooltipButton>
+              <TooltipButton
                 className={`tool-button ${tool === "transform-all" ? "active" : ""}`}
                 title="Select multiple annotations to move or scale together (B)"
                 aria-keyshortcuts="B"
@@ -1077,10 +1080,10 @@ export function AdminFormWorkspace({
                 disabled={!pageAnnotations.length}
               >
                 <BoxSelect size={16} />
-              </button>
+              </TooltipButton>
               {tool === "transform-all" && (
                 <>
-                  <button
+                  <TooltipButton
                     className="tool-button admin-group-selection-action"
                     type="button"
                     title="Select all annotations on this page (Cmd/Ctrl+A)"
@@ -1089,22 +1092,23 @@ export function AdminFormWorkspace({
                     disabled={groupSelection.length === pageAnnotations.length}
                   >
                     Select all
-                  </button>
-                  <button
+                  </TooltipButton>
+                  <TooltipButton
                     className="tool-button admin-group-selection-action"
                     type="button"
+                    title="Clear the current box selection"
                     onClick={() => setGroupSelection([])}
                     disabled={!groupSelection.length}
                   >
                     Clear
-                  </button>
+                  </TooltipButton>
                   <span className="group-selection-count">{groupAnnotations.length} selected</span>
                 </>
               )}
-              <button className={`tool-button ${tool === "draw" ? "active" : ""}`} type="button" aria-label="Add annotation" aria-pressed={tool === "draw"} title="Add annotation: double-click the page or drag to draw a box" onClick={() => setTool("draw")}>
+              <TooltipButton className={`tool-button ${tool === "draw" ? "active" : ""}`} type="button" aria-label="Add annotation" aria-pressed={tool === "draw"} title="Add annotation: double-click the page or drag to draw a box" onClick={() => setTool("draw")}>
                 <Plus size={16} />
-              </button>
-              <button
+              </TooltipButton>
+              <TooltipButton
                 type="button"
                 className={`tool-button ${showBoxLabels ? "active" : ""}`}
                 title={`${showBoxLabels ? "Hide" : "Show"} annotation labels`}
@@ -1113,8 +1117,8 @@ export function AdminFormWorkspace({
                 onClick={() => setShowBoxLabels((current) => !current)}
               >
                 {showBoxLabels ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
-              <button
+              </TooltipButton>
+              <TooltipButton
                 type="button"
                 className={`tool-button ${showAnnotationText ? "active" : ""}`}
                 title={`${showAnnotationText ? "Hide" : "Show"} annotated text`}
@@ -1123,26 +1127,26 @@ export function AdminFormWorkspace({
                 onClick={() => setShowAnnotationText((current) => !current)}
               >
                 <FileText size={16} />
-              </button>
+              </TooltipButton>
             </div>
             <div className="tool-group">
-              <button
+              <TooltipButton
                 className="tool-button"
                 title="Zoom out"
                 onClick={() => setZoom((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP))}
                 disabled={zoom <= MIN_ZOOM}
               >
                 <ZoomOut size={15} />
-              </button>
+              </TooltipButton>
               <span className="zoom-readout">{Math.round(zoom * 100)}%</span>
-              <button
+              <TooltipButton
                 className="tool-button"
                 title="Zoom in"
                 onClick={() => setZoom((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP))}
                 disabled={zoom >= MAX_ZOOM}
               >
                 <ZoomIn size={15} />
-              </button>
+              </TooltipButton>
             </div>
           </div>
           <div
@@ -1205,6 +1209,7 @@ export function AdminFormWorkspace({
                         bbox: [x, y, x + 160, y + 50],
                         page: pageIndex + 1,
                         readingOrder: getNextReadingOrder(annotations),
+                        language: "si",
                       });
                       setAnnotations((current) => [...current, annotation]);
                       setSelectedId(annotation.id);
@@ -1293,7 +1298,8 @@ export function AdminFormWorkspace({
                               <text
                                 x={boxX + 4}
                                 y={boxBottom + 13}
-                                className="admin-annotation-text"
+                                className="admin-annotation-text annotation-language-text"
+                                lang={annotation.language ?? "si"}
                               >
                                 {visibleAnnotationText}
                               </text>
@@ -1589,7 +1595,10 @@ export function AdminFormWorkspace({
                     {!document && selectedCorrectionTemplate && <small>Upload the matching source PDF to enable the download.</small>}
                   </>
                 )}
+                <AnnotationFieldLabel htmlFor="annotation-import-json" label="Annotation JSON" help="Paste a previously downloaded annotation JSON document. Loading it replaces the current boxes and text; your uploaded PDF stays in place." />
                 <textarea
+                  id="annotation-import-json"
+                  aria-describedby="annotation-import-json-help"
                   className="textarea admin-template-json-text"
                   value={templateJsonText}
                   onChange={(event) => setTemplateJsonText(event.target.value)}
@@ -1620,27 +1629,32 @@ export function AdminFormWorkspace({
               <h3>Selected annotation</h3>
               <div className="form-grid">
                 <div className="field">
-                  <label htmlFor="admin-annotation-text">Text</label>
+                  <AnnotationFieldLabel htmlFor="admin-annotation-text" label="Text" help="Enter the text visible inside this box. Signatures, stamps, logos, and tables may be left empty." />
                   <textarea
                     id="admin-annotation-text"
+                    aria-describedby="admin-annotation-text-help"
                     ref={annotationTextRef}
                     className="textarea admin-selected-textarea"
-                    lang="si"
+                    lang={selected.language ?? "si"}
                     value={selected.text}
                     onChange={(event) => updateAnnotation(selected.id, { text: event.target.value, intentionallyBlank: event.target.value.trim() ? undefined : selected.intentionallyBlank })}
                   />
                 </div>
                 {isPublic && selected.label === "Handwritten text" && (
+                  <div className="field-label-with-help">
                   <label className="annotation-blank-option">
-                    <input type="checkbox" checked={Boolean(selected.intentionallyBlank)} disabled={Boolean(selected.text.trim())}
+                    <input type="checkbox" checked={Boolean(selected.intentionallyBlank)} disabled={Boolean(selected.text.trim())} aria-describedby="intentionally-blank-help"
                       onChange={(event) => updateAnnotation(selected.id, { intentionallyBlank: event.target.checked || undefined })} />
                     Intentionally blank
                   </label>
+                  <FieldHelp id="intentionally-blank-help" label="Intentionally blank" text="Use for an answer field that is deliberately empty. Clear the text first. This allows an empty handwritten box to pass download validation." />
+                  </div>
                 )}
                 <div className="field">
-                  <label htmlFor="admin-annotation-label">Label</label>
+                  <AnnotationFieldLabel htmlFor="admin-annotation-label" label="Label" help="Choose what this region contains. Its label determines the box color and whether text is required." />
                   <CustomSelect
                     id="admin-annotation-label"
+                    aria-describedby="admin-annotation-label-help"
                     native={!isPublic}
                     value={selected.label}
                     options={LABELS.map((label) => ({ value: label, label, color: LABEL_COLORS[label].stroke }))}
@@ -1648,9 +1662,10 @@ export function AdminFormWorkspace({
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="admin-annotation-reading-order">Reading order</label>
+                  <AnnotationFieldLabel htmlFor="admin-annotation-reading-order" label="Reading order" help="The order in which this region should be read on the document. Start at 1 and follow the natural reading sequence." />
                   <input
                     id="admin-annotation-reading-order"
+                    aria-describedby="admin-annotation-reading-order-help"
                     className="input"
                     type="number"
                     min={1}
@@ -1659,9 +1674,10 @@ export function AdminFormWorkspace({
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="admin-annotation-question-id">Question ID</label>
+                  <AnnotationFieldLabel htmlFor="admin-annotation-question-id" label="Question ID" help="Optional. Use the same ID, such as q001, to link a question, its translations, and its answer box." />
                   <input
                     id="admin-annotation-question-id"
+                    aria-describedby="admin-annotation-question-id-help"
                     className="input"
                     value={selected.questionId ?? ""}
                     onChange={(event) => updateAnnotation(selected.id, { questionId: event.target.value.trim() || undefined })}
@@ -1669,9 +1685,10 @@ export function AdminFormWorkspace({
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="admin-annotation-language">Language</label>
+                  <AnnotationFieldLabel htmlFor="admin-annotation-language" label="Language" help="Choose the language of the text inside this box. Leave unspecified for regions without text." />
                   <CustomSelect
                     id="admin-annotation-language"
+                    aria-describedby="admin-annotation-language-help"
                     native={!isPublic}
                     value={selected.language ?? ""}
                     options={[{ value: "", label: "Not specified" }, ...SRI_PAGE_LANGUAGES.map((language) => ({ value: language, label: isPublic ? LANGUAGE_DISPLAY[language].label : language, symbol: LANGUAGE_DISPLAY[language].symbol, lang: language }))]}
@@ -1680,7 +1697,7 @@ export function AdminFormWorkspace({
                 </div>
                 <dl className="admin-annotation-meta">
                   <div><dt>Page</dt><dd>{isPublic ? (
-                    <input className="input" type="number" aria-label="Annotation page" min={1} max={document?.numPages ?? 1} value={selected.page}
+                    <input className="input" type="number" aria-label="Annotation page" title="PDF page containing this box. Changing it moves the annotation to that page." min={1} max={document?.numPages ?? 1} value={selected.page}
                       onChange={(event) => {
                         const page = Math.min(document?.numPages ?? 1, Math.max(1, Number(event.target.value) || 1));
                         updateAnnotation(selected.id, { page });
@@ -1690,9 +1707,10 @@ export function AdminFormWorkspace({
                 </dl>
                 {isTemplateMode && (
                   <div className="field">
-                    <label htmlFor="admin-annotation-field-key">Field key</label>
+                    <AnnotationFieldLabel htmlFor="admin-annotation-field-key" label="Field key" help="Optional. A stable name for an answer field, such as fullName. Use the same key for boxes that represent the same answer." />
                     <input
                       id="admin-annotation-field-key"
+                    aria-describedby="admin-annotation-field-key-help"
                       className="input"
                       value={selected.fieldKey ?? ""}
                       onChange={(event) => updateAnnotation(selected.id, {
@@ -1733,7 +1751,7 @@ export function AdminFormWorkspace({
                     <span className="admin-annotation-swatch" style={{ background: LABEL_COLORS[annotation.label].stroke }} />
                     {annotation.readingOrder}. {annotation.label}
                   </strong>
-                  <span>{annotation.text || "(empty text)"}</span>
+                  <span className="annotation-language-text" lang={annotation.language ?? "si"}>{annotation.text || "(empty text)"}</span>
                 </button>
               ))}
               {!pageAnnotations.length && <p style={{ color: "var(--muted)", fontSize: 11 }}>No annotations on this page.</p>}
@@ -2024,7 +2042,9 @@ function createAnnotation({
   bbox,
   page,
   readingOrder,
+  language,
 }: {
+  language?: SriPageLanguage;
   bbox: AdminAnnotation["bbox"];
   page: number;
   readingOrder: number;
@@ -2033,6 +2053,7 @@ function createAnnotation({
     id: crypto.randomUUID(),
     page,
     readingOrder,
+    ...(language ? { language } : {}),
     label: "Printed text",
     text: "",
     bbox,

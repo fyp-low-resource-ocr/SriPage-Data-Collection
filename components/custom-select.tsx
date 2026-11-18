@@ -5,13 +5,14 @@ import { useEffect, useRef, useState } from "react";
 
 type Option = { value: string; label: string; color?: string; symbol?: string; lang?: string };
 
-export function CustomSelect({ id, value, options, onChange, disabled, native = false }: {
+export function CustomSelect({ id, value, options, onChange, disabled, native = false, "aria-describedby": describedBy }: {
   id: string;
   value: string;
   options: Option[];
   onChange: (value: string) => void;
   disabled?: boolean;
   native?: boolean;
+  "aria-describedby"?: string;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -33,7 +34,7 @@ export function CustomSelect({ id, value, options, onChange, disabled, native = 
   }, [open]);
 
   if (native) return (
-    <select id={id} className="select" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+    <select aria-describedby={describedBy} id={id} className="select" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
   );
@@ -65,7 +66,7 @@ export function CustomSelect({ id, value, options, onChange, disabled, native = 
         buttons[match]?.focus();
       }
     }}>
-      <button id={id} ref={trigger} type="button" className="select custom-select-trigger" disabled={disabled}
+      <button aria-describedby={describedBy} id={id} ref={trigger} type="button" className="select custom-select-trigger" disabled={disabled}
         aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-options`} onClick={() => setOpen((current) => !current)}>
         <span>{selected?.symbol && <span className="custom-select-language-icon" lang={selected.lang} aria-hidden="true">{selected.symbol}</span>}{selected?.color && <i className="custom-select-swatch" style={{ background: selected.color }} />}{selected?.label ?? "Select an option"}</span>
         <ChevronDown size={15} className={open ? "custom-select-chevron open" : "custom-select-chevron"} />
