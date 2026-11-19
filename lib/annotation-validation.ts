@@ -16,7 +16,7 @@ export function validateAnnotations(annotations: SriPageAnnotation[], pageCount:
     }
     if (annotation.page > pageCount) add("page", `Page ${annotation.page} does not exist in this PDF (${pageCount} pages).`);
     if (!OPTIONAL_TEXT_LABELS.has(annotation.label) && !annotation.text.trim()
-      && !(annotation.label === "Handwritten text" && annotation.intentionallyBlank)) {
+      && !(["Handwritten text", "List-item"].includes(annotation.label) && annotation.intentionallyBlank)) {
       add("text", `${annotation.label} needs text.`);
     }
     return issues;

@@ -14,8 +14,8 @@ const LABEL_COLORS: Record<string, { stroke: string; fill: string }> = {
   "Page-footer": { stroke: "#0e7490", fill: "rgba(14, 116, 144, .09)" },
   "List-item": { stroke: "#4f46e5", fill: "rgba(79, 70, 229, .09)" },
   Footnote: { stroke: "#64748b", fill: "rgba(100, 116, 139, .10)" },
-  Signature: { stroke: "#dc2626", fill: "rgba(220, 38, 38, .09)" },
-  Stamp: { stroke: "#be123c", fill: "rgba(190, 18, 60, .10)" },
+  Signature: { stroke: "#0f766e", fill: "rgba(15, 118, 110, .10)" },
+  Stamp: { stroke: "#475569", fill: "rgba(71, 85, 105, .10)" },
 };
 
 const DEFAULT_LABEL_COLOR = { stroke: "#dc2626", fill: "rgba(220, 38, 38, .09)" };

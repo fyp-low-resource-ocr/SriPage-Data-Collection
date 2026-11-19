@@ -45,11 +45,13 @@ export function PdfPageCanvas({
   pageIndex,
   scale,
   onSize,
+  onRendered,
 }: {
   document: PDFDocumentProxy;
   pageIndex: number;
   scale: number;
   onSize?: (size: { width: number; height: number }) => void;
+  onRendered?: (page: { pageIndex: number; width: number; height: number }) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -68,7 +70,9 @@ export function PdfPageCanvas({
       canvas.style.height = `${Math.floor(viewport.height)}px`;
       onSize?.({ width: viewport.width, height: viewport.height });
       renderTask = page.render({ canvas, canvasContext: context, viewport });
-      return renderTask.promise;
+      return renderTask.promise.then(() => {
+        if (!cancelled) onRendered?.({ pageIndex, width: viewport.width, height: viewport.height });
+      });
     }).catch((reason) => {
       if (reason?.name !== "RenderingCancelledException") console.error(reason);
     });
@@ -76,7 +80,7 @@ export function PdfPageCanvas({
       cancelled = true;
       renderTask?.cancel();
     };
-  }, [document, pageIndex, scale, onSize]);
+  }, [document, pageIndex, scale, onSize, onRendered]);
 
   return <canvas ref={canvasRef} aria-label={`PDF page ${pageIndex + 1}`} />;
 }

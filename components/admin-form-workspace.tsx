@@ -5,11 +5,10 @@ import Link from "next/link";
 import { editSinhalaPhonetic, getSinhalaSpellingOptions, replacePhoneticSpelling, type PhoneticSession } from "@/lib/sinhala-phonetic";
 import { getTamil99Character, insertTamilCharacter } from "@/lib/tamil-keyboard";
 import { useAnnotationHistory } from "@/lib/client/use-annotation-history";
-import { moveAnnotationToPosition, readingPositionKey, suggestLocalReadingOrder } from "@/lib/annotation-reading-order";
+import { getAnnotationScrollPosition } from "@/lib/client/annotation-scroll";
 import { validateAnnotations } from "@/lib/annotation-validation";
 import { readAnnotationDraft, writeAnnotationDraft, deleteAnnotationDraft, type AnnotationDraft } from "@/lib/client/annotation-draft-store";
 import { AnnotationFieldLabel, FieldHelp } from "./field-help";
-import { ReadingOrderDialog } from "./reading-order-dialog";
 import { TooltipButton } from "./tooltip-button";
 import { CustomSelect } from "./custom-select";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
@@ -73,8 +72,8 @@ const LABEL_COLORS: Record<SriPageLabel, { stroke: string; fill: string }> = {
   "Page-footer": { stroke: "#0e7490", fill: "rgba(14, 116, 144, .09)" },
   "List-item": { stroke: "#4f46e5", fill: "rgba(79, 70, 229, .09)" },
   Footnote: { stroke: "#64748b", fill: "rgba(100, 116, 139, .10)" },
-  Signature: { stroke: "#dc2626", fill: "rgba(220, 38, 38, .09)" },
-  Stamp: { stroke: "#be123c", fill: "rgba(190, 18, 60, .10)" },
+  Signature: { stroke: "#0f766e", fill: "rgba(15, 118, 110, .10)" },
+  Stamp: { stroke: "#475569", fill: "rgba(71, 85, 105, .10)" },
 };
 
 function annotationColorStyle(label: SriPageLabel): CSSProperties {
@@ -141,10 +140,13 @@ export function AdminFormWorkspace({
   const [typingPreference, setTypingPreference] = useState<{ annotationId: string; language: SriPageLanguage } | null>(null);
   const typingSelectionRef = useRef<{ annotationId: string; start: number; end: number } | null>(null);
   const [sidebarSection, setSidebarSection] = useState<"load" | "edit">("edit");
-  const [keptReadingPositions, setKeptReadingPositions] = useState<Record<string, string>>({});
-  const [pendingReadingOrderId, setPendingReadingOrderId] = useState<string | null>(null);
   const [highlightValidation, setHighlightValidation] = useState(false);
-  const validationListRef = useRef<HTMLDivElement>(null);
+  const pdfScrollRef = useRef<HTMLDivElement>(null);
+  const pageStageRef = useRef<HTMLDivElement>(null);
+  const warningRequestCounter = useRef(0);
+  const handledWarningRequest = useRef(0);
+  const [warningTarget, setWarningTarget] = useState<{ annotationId: string; pageIndex: number; request: number } | null>(null);
+  const [renderedPage, setRenderedPage] = useState<{ pageIndex: number; width: number; height: number; url: string | null; zoom: number } | null>(null);
   const bypassPhoneticInputRef = useRef(false);
   const [spellingSession, setSpellingSession] = useState<PhoneticSession | null>(null);
   const phoneticSessionRef = useRef<PhoneticSession | null>(null);
@@ -213,9 +215,49 @@ export function AdminFormWorkspace({
     annotations?: AdminAnnotation[];
     bounds?: Bounds;
     resizeHandle?: ResizeHandle;
-    moved?: boolean;
   } | null>(null);
   const setSize = useCallback((size: { width: number; height: number }) => setPageSize(size), [setPageSize]);
+
+  const onPageRendered = useCallback((page: { pageIndex: number; width: number; height: number }) => {
+    setRenderedPage({ ...page, url: pdfUrl, zoom });
+  }, [pdfUrl, zoom]);
+
+  function revealWarningBox(annotationId: string) {
+    const annotation = annotations.find((box) => box.id === annotationId);
+    if (!annotation || !document) return;
+    const targetPage = Math.min(Math.max(0, annotation.page - 1), document.numPages - 1);
+    setPageIndex(targetPage);
+    setSelectedId(annotationId);
+    setGroupSelection([]);
+    setTool("select");
+    setHighlightValidation(true);
+    setSidebarSection("edit");
+    setWarningTarget({ annotationId, pageIndex: targetPage, request: ++warningRequestCounter.current });
+  }
+
+  useEffect(() => {
+    if (!warningTarget || handledWarningRequest.current === warningTarget.request
+      || renderedPage?.url !== pdfUrl || renderedPage?.pageIndex !== warningTarget.pageIndex
+      || renderedPage?.zoom !== zoom || pageIndex !== warningTarget.pageIndex) return;
+    const annotation = annotations.find((box) => box.id === warningTarget.annotationId);
+    if (!annotation || annotation.page !== pageIndex + 1) return;
+    const frame = requestAnimationFrame(() => {
+      const scroller = pdfScrollRef.current;
+      const stage = pageStageRef.current;
+      if (!scroller || !stage) return;
+      const viewport = scroller.getBoundingClientRect();
+      const scrollPosition = getAnnotationScrollPosition({
+        bbox: annotation.bbox,
+        page: stage.getBoundingClientRect(),
+        viewport: { left: viewport.left, top: viewport.top, width: scroller.clientWidth, height: scroller.clientHeight },
+        scroll: { left: scroller.scrollLeft, top: scroller.scrollTop },
+        limits: { left: scroller.scrollWidth - scroller.clientWidth, top: scroller.scrollHeight - scroller.clientHeight },
+      });
+      scroller.scrollTo({ ...scrollPosition, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+      handledWarningRequest.current = warningTarget.request;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [warningTarget, renderedPage, annotations, pdfUrl, pageIndex, zoom]);
 
   const pageAnnotations = useMemo(
     () => annotations.filter((annotation) => annotation.page === pageIndex + 1).sort((a, b) => a.readingOrder - b.readingOrder),
@@ -223,9 +265,6 @@ export function AdminFormWorkspace({
   );
   const validationIssues = useMemo(() => validateAnnotations(annotations, document?.numPages ?? 0), [annotations, document?.numPages]);
   const invalidAnnotationIds = useMemo(() => new Set(validationIssues.map((issue) => issue.annotationId)), [validationIssues]);
-  const readingOrderSuggestion = useMemo(() => isPublic && pendingReadingOrderId
-    ? suggestLocalReadingOrder(annotations, pendingReadingOrderId, keptReadingPositions) : null,
-    [annotations, isPublic, pendingReadingOrderId, keptReadingPositions]);
   const selected = annotations.find((annotation) => annotation.id === selectedId) ?? null;
   const spellingOptions = spellingSession && selected?.id === spellingSession.scope
     && selected.text.slice(spellingSession.start, spellingSession.start + spellingSession.rendered.length) === spellingSession.rendered
@@ -250,7 +289,6 @@ export function AdminFormWorkspace({
         pdfBlobRef.current = draft.pdf;
         if (draft.pdf) setPdfUrl(URL.createObjectURL(draft.pdf));
         setPdfName(draft.pdfName);
-        setKeptReadingPositions(draft.keptReadingPositions ?? {});
         resetAnnotations(draft.document.annotations);
         setTemplateMetadata(draft.document.metadata);
         setPageIndex(draft.pageIndex);
@@ -275,7 +313,7 @@ export function AdminFormWorkspace({
     const draft: AnnotationDraft = {
       version: 1, pdf: pdfBlobRef.current, pdfName,
       document: { metadata: templateMetadata, annotations },
-      pageIndex, zoom, showBoxLabels, showAnnotationText, keptReadingPositions, updatedAt: Date.now(),
+      pageIndex, zoom, showBoxLabels, showAnnotationText, updatedAt: Date.now(),
     };
     latestDraftRef.current = draft;
     draftTimerRef.current = setTimeout(() => {
@@ -289,7 +327,7 @@ export function AdminFormWorkspace({
     return () => {
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     };
-  }, [isPublic, draftReady, clearingDraft, annotations, templateMetadata, pdfName, pdfUrl, pageIndex, zoom, showBoxLabels, showAnnotationText, keptReadingPositions]);
+  }, [isPublic, draftReady, clearingDraft, annotations, templateMetadata, pdfName, pdfUrl, pageIndex, zoom, showBoxLabels, showAnnotationText]);
 
   useEffect(() => {
     if (!isPublic) return;
@@ -323,8 +361,6 @@ export function AdminFormWorkspace({
       setPdfUrl(null);
       setPdfName("");
       resetAnnotations([]);
-      setKeptReadingPositions({});
-      setPendingReadingOrderId(null);
       setTemplateMetadata({ schemaVersion: "1.1", id: "untitled-template", name: "Untitled template", source: "" });
       setPageIndex(0);
       setZoom(1);
@@ -484,21 +520,13 @@ export function AdminFormWorkspace({
     const duplicate = { ...source, id: crypto.randomUUID(), bbox: moveBBox(source.bbox, 12, 12), readingOrder: getNextReadingOrder(annotations) };
     setAnnotations((current) => [...current, duplicate]);
     setSelectedId(duplicate.id);
-    if (isPublic) setPendingReadingOrderId(duplicate.id);
     setTool("select");
     setSaveState("idle");
     setSaveError("");
   }
 
   function updateAnnotation(id: string, patch: Partial<AdminAnnotation>) {
-    setAnnotations((current) => {
-      const updated = current.map((annotation) => annotation.id === id ? { ...annotation, ...patch, readingOrder: annotation.readingOrder } : annotation);
-      if (patch.readingOrder !== undefined) {
-        if (isPublic) return moveAnnotationToPosition(updated, id, patch.readingOrder);
-        return updated.map((annotation) => annotation.id === id ? { ...annotation, readingOrder: patch.readingOrder! } : annotation);
-      }
-      return updated;
-    });
+    setAnnotations((current) => current.map((annotation) => annotation.id === id ? { ...annotation, ...patch } : annotation));
     setSaveState("idle");
     setSaveError("");
   }
@@ -598,7 +626,6 @@ export function AdminFormWorkspace({
             interaction.resizeHandle ?? "bottom-right",
             event.shiftKey,
           );
-      interaction.moved = transformed.some((box, index) => box.bbox.some((coordinate, axis) => coordinate !== interaction.annotations![index].bbox[axis]));
       const transformedById = new Map(transformed.map((annotation) => [annotation.id, annotation]));
       setAnnotations((current) => current.map((annotation) => transformedById.get(annotation.id) ?? annotation));
       setSaveState("idle");
@@ -610,8 +637,6 @@ export function AdminFormWorkspace({
     const bbox = interaction.type === "move"
       ? moveBBox(interaction.bbox, dx, dy)
       : resizeBBox(interaction.bbox, dx, dy);
-
-    interaction.moved = bbox.some((coordinate, index) => coordinate !== interaction.bbox![index]);
     updateAnnotation(interaction.annotationId, { bbox });
   }
 
@@ -650,7 +675,7 @@ export function AdminFormWorkspace({
 
         setAnnotations((current) => [...current, annotation]);
         setSelectedId(annotation.id);
-        if (isPublic) { setSidebarSection("edit"); setPendingReadingOrderId(annotation.id); }
+        if (isPublic) setSidebarSection("edit");
         setTool("select");
         setSaveState("idle");
         setSaveError("");
@@ -659,12 +684,6 @@ export function AdminFormWorkspace({
       setDrawCurrent(null);
     }
 
-    const interaction = interactionRef.current;
-    const movedId = interaction?.annotationId;
-    if (isPublic && interaction?.type === "move" && interaction.moved && movedId) {
-      setPendingReadingOrderId(movedId);
-      setSidebarSection("edit");
-    }
     interactionRef.current = null;
     endHistory();
   }
@@ -735,16 +754,7 @@ export function AdminFormWorkspace({
         setHighlightValidation(true);
         setSidebarSection("edit");
         const firstIssue = validationIssues[0];
-        if (firstIssue && document) {
-          setPageIndex(Math.min(Math.max(0, firstIssue.page - 1), document.numPages - 1));
-          setSelectedId(firstIssue.annotationId);
-          setGroupSelection([]);
-          setTool("select");
-        }
-        requestAnimationFrame(() => {
-          validationListRef.current?.scrollIntoView({ block: "nearest" });
-          validationListRef.current?.focus();
-        });
+        if (firstIssue && document) revealWarningBox(firstIssue.annotationId);
         return;
       }
     }
@@ -761,8 +771,6 @@ export function AdminFormWorkspace({
     try {
       const parsed = annotationDocumentSchema.parse(JSON.parse(text));
       setAnnotations(parsed.annotations);
-      setKeptReadingPositions({});
-      setPendingReadingOrderId(null);
       setTemplateMetadata(parsed.metadata);
       setSelectedId(parsed.annotations[0]?.id ?? null);
       setPageIndex(0);
@@ -827,8 +835,6 @@ export function AdminFormWorkspace({
       if (!response.ok) throw new Error(`Could not load ${fileName}.`);
       const parsed = annotationDocumentSchema.parse(await response.json());
       setAnnotations(parsed.annotations);
-      setKeptReadingPositions({});
-      setPendingReadingOrderId(null);
       setTemplateMetadata(parsed.metadata);
       setSelectedId(parsed.annotations[0]?.id ?? null);
       setPageIndex(0);
@@ -1108,23 +1114,6 @@ export function AdminFormWorkspace({
         </TooltipButton>
       </header>
 
-      {readingOrderSuggestion && pendingReadingOrderId && (
-        <ReadingOrderDialog
-          current={readingOrderSuggestion.box}
-          position={readingOrderSuggestion.position}
-          previous={readingOrderSuggestion.previous}
-          next={readingOrderSuggestion.next}
-          reason={readingOrderSuggestion.reason}
-          onApply={() => {
-            updateAnnotation(pendingReadingOrderId, { readingOrder: readingOrderSuggestion.position });
-            setPendingReadingOrderId(null);
-          }}
-          onKeep={() => {
-            setKeptReadingPositions((current) => ({ ...current, [pendingReadingOrderId]: readingPositionKey(readingOrderSuggestion.box) }));
-            setPendingReadingOrderId(null);
-          }}
-        />
-      )}
       {isPublic && !draftReady && <div className="workspace-restore-overlay" role="status"><span className="spinner" /> Restoring workspace…</div>}
       <div inert={isPublic && (!draftReady || clearingDraft)} className={`editor-grid ${pagesExpanded ? "" : "pages-collapsed"} ${isPublic && !document ? "awaiting-pdf" : ""}`}>
         <aside className="side-panel document-pages-panel">
@@ -1258,6 +1247,7 @@ export function AdminFormWorkspace({
             </div>
           </div>
           <div
+            ref={pdfScrollRef}
             className={`canvas-scroll ${draggingPdf ? "pdf-drag-active" : ""}`}
             onDragOver={(event) => {
               if (!event.dataTransfer.types.includes("Files")) return;
@@ -1295,8 +1285,8 @@ export function AdminFormWorkspace({
                 </button>
               </div>
             ) : document ? (
-              <div className="page-stage">
-                <PdfPageCanvas document={document} pageIndex={pageIndex} scale={1.35 * zoom} onSize={setSize} />
+              <div className="page-stage" ref={pageStageRef}>
+                <PdfPageCanvas document={document} pageIndex={pageIndex} scale={1.35 * zoom} onSize={setSize} onRendered={onPageRendered} />
                 {pageSize.width > 0 && (
                   <svg
                     className={`annotation-layer annotation-tool-${tool}`}
@@ -1321,7 +1311,6 @@ export function AdminFormWorkspace({
                       });
                       setAnnotations((current) => [...current, annotation]);
                       setSelectedId(annotation.id);
-                      setPendingReadingOrderId(annotation.id);
                       setTool("select");
                       setSidebarSection("edit");
                       setSaveState("idle");
@@ -1348,7 +1337,7 @@ export function AdminFormWorkspace({
                             y={boxY}
                             width={box.width * pageSize.width}
                             height={box.height * pageSize.height}
-                            className={`admin-annotation-box ${annotation.id === selectedId || (tool === "transform-all" && groupSelection.includes(annotation.id)) ? "active" : ""} ${selected?.questionId && annotation.questionId === selected.questionId && annotation.id !== selected.id ? "linked" : ""}`}
+                            className={`admin-annotation-box ${warningTarget?.annotationId === annotation.id && selectedId === annotation.id && invalidAnnotationIds.has(annotation.id) ? "annotation-warning-focused" : ""} ${annotation.id === selectedId || (tool === "transform-all" && groupSelection.includes(annotation.id)) ? "active" : ""} ${selected?.questionId && annotation.questionId === selected.questionId && annotation.id !== selected.id ? "linked" : ""}`}
                             style={{
                               ...annotationColorStyle(annotation.label),
                               ...(isPublic && highlightValidation && invalidAnnotationIds.has(annotation.id) ? {
@@ -1919,14 +1908,14 @@ export function AdminFormWorkspace({
                   </details>
                 )}
                 </>}
-                {isPublic && selected.label === "Handwritten text" && (
+                {isPublic && ["Handwritten text", "List-item"].includes(selected.label) && (
                   <div className="field-label-with-help">
                   <label className="annotation-blank-option">
                     <input type="checkbox" checked={Boolean(selected.intentionallyBlank)} disabled={Boolean(selected.text.trim())} aria-describedby="intentionally-blank-help"
                       onChange={(event) => updateAnnotation(selected.id, { intentionallyBlank: event.target.checked || undefined })} />
                     Intentionally blank
                   </label>
-                  <FieldHelp id="intentionally-blank-help" label="Intentionally blank" text="Use for an answer field that is deliberately empty. Clear the text first. This allows an empty handwritten box to pass download validation." />
+                  <FieldHelp id="intentionally-blank-help" label="Intentionally blank" text="Use for a handwritten answer or list item that is deliberately empty. Clear the text first. Marked empty boxes pass download validation and keep an empty text value in JSON." />
                   </div>
                 )}
                 <div className="field annotation-label-field">
@@ -1944,14 +1933,13 @@ export function AdminFormWorkspace({
                   />
                 </div>
                 <div className="field">
-                  <AnnotationFieldLabel htmlFor="admin-annotation-reading-order" label="Reading order" help={isPublic ? "Move this box to a reading position. Other boxes are renumbered automatically, keeping their relative order. For side-by-side boxes, choose the sequence in which they should be read." : "The order in which this region should be read on the document. Start at 1 and follow the natural reading sequence."} />
+                  <AnnotationFieldLabel htmlFor="admin-annotation-reading-order" label="Reading order" help="Set the reading-order number for this box. Other boxes are not changed." />
                   <input
                     id="admin-annotation-reading-order"
                     aria-describedby="admin-annotation-reading-order-help"
                     className="input"
                     type="number"
                     min={1}
-                    max={isPublic ? annotations.length : undefined}
                     value={selected.readingOrder}
                     onChange={(event) => updateAnnotation(selected.id, { readingOrder: Math.max(1, Number(event.target.value) || 1) })}
                   />
@@ -2047,21 +2035,12 @@ export function AdminFormWorkspace({
           {isPublic && isTemplateMode && (
             <div className="panel-section">
               {(!annotations.length || validationIssues.length > 0) && (
-                <div className="annotation-validation" role="alert" ref={validationListRef} tabIndex={-1}>
+                <div className="annotation-validation" role="alert">
                   <strong>{!annotations.length ? "Add an annotation before downloading." : `${new Set(validationIssues.map((issue) => issue.annotationId)).size} annotation(s) need attention`}</strong>
                   {highlightValidation && annotations.length > 0 && <p>Download unavailable. Highlighted boxes need correction. Select an issue below to review it.</p>}
                   <div className="annotation-validation-list">
                     {validationIssues.map((issue, index) => (
-                      <button type="button" key={`${issue.annotationId}-${index}`} onClick={() => {
-                        setPageIndex(Math.min(Math.max(0, issue.page - 1), (document?.numPages ?? 1) - 1));
-                        setSelectedId(issue.annotationId);
-                        setGroupSelection([]);
-                        setTool("select");
-                        requestAnimationFrame(() => {
-                          annotationTextRef.current?.scrollIntoView({ block: "nearest" });
-                          if (issue.field === "text") annotationTextRef.current?.focus();
-                        });
-                      }}>
+                      <button type="button" key={`${issue.annotationId}-${index}`} onClick={() => revealWarningBox(issue.annotationId)}>
                         Page {issue.page} · Box {issue.readingOrder} ({annotations.find((annotation) => annotation.id === issue.annotationId)?.label}): {issue.message}
                       </button>
                     ))}

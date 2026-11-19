@@ -1235,31 +1235,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   user-select: none;
 }
 
-.reading-order-dialog {
-  position: fixed;
-  inset: 0;
-  width: min(420px, calc(100vw - 32px));
-  max-height: calc(100dvh - 40px);
-  overflow: auto;
-  margin: auto;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 20px 70px rgba(0, 0, 0, .24);
-}
-.reading-order-dialog[open] { animation: reading-order-dialog-enter 200ms ease-out; }
-.reading-order-dialog::backdrop { background: rgba(0, 0, 0, .22); }
-.reading-order-dialog h2 { margin: 0 0 12px; font-size: 18px; line-height: 1.4; }
-.reading-order-dialog p { margin: 0; font-size: 13px; line-height: 1.7; color: var(--muted); }
-.reading-order-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-@keyframes reading-order-dialog-enter { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@media (prefers-reduced-motion: reduce) { .reading-order-dialog[open] { animation: none; } }
 
 
-.reading-order-local-summary { margin: 18px 0; padding: 12px; background: var(--wash); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.6; }
-.reading-order-dialog strong { font-family: var(--font-geist), var(--font-sinhala), var(--font-tamil), sans-serif; }
 
 
 .home-layout { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 48px 0 56px; }
@@ -1392,3 +1369,8 @@ html,
 
 .workspace-public .annotation-label-field { grid-row: 1; }
 .annotation-region-note { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--wash); color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.admin-annotation-box.annotation-warning-focused { stroke-width: 3; stroke-dasharray: 5 2; filter: drop-shadow(0 0 3px rgba(220, 38, 38, .35)); }
+@media (max-width: 760px) {
+  .workspace-public .editor-grid:not(.awaiting-pdf) .canvas-scroll { flex: none; height: 65dvh; min-height: 360px; }
+}

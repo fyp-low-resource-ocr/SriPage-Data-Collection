@@ -28,8 +28,8 @@ describe("download annotation validation", () => {
   it.each<SriPageLabel>(["Signature", "Stamp", "Logo", "Table"])("allows empty %s", (label) => {
     expect(validateAnnotations([box({ label })], 1)).toEqual([]);
   });
-  it("only exempts intentionally blank handwritten text and preserves the flag", () => {
-    const annotation = box({ label: "Handwritten text", intentionallyBlank: true });
+  it.each<SriPageLabel>(["Handwritten text", "List-item"])("accepts intentionally blank %s and preserves the flag", (label) => {
+    const annotation = box({ label, intentionallyBlank: true });
     expect(validateAnnotations([annotation], 1)).toEqual([]);
     expect(sriPageAnnotationSchema.parse(annotation).intentionallyBlank).toBe(true);
     expect(validateAnnotations([box({ intentionallyBlank: true })], 1)).toHaveLength(1);
