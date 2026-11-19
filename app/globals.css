@@ -1389,3 +1389,6 @@ html,
 .public-form-nav a:hover { border-color: #999999; background: #f2f2f2; }
 .public-form-nav a:last-child:hover { border-color: #333333; background: #333333; color: #ffffff; }
 @media (max-width: 760px) { .public-form-nav { gap: 7px; padding: 0; } }
+
+.workspace-public .annotation-label-field { grid-row: 1; }
+.annotation-region-note { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--wash); color: var(--muted); font-size: 12px; line-height: 1.6; }

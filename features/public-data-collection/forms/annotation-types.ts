@@ -68,7 +68,7 @@ export const sriPageAnnotationSchema: z.ZodType<SriPageAnnotation> = z.object({
   page: z.number().int().positive(),
   readingOrder: z.number().int().positive(),
   label: z.enum(SRI_PAGE_LABELS),
-  text: z.string().max(10_000),
+  text: z.string().max(10_000).default(""),
   bbox: bboxSchema,
   questionId: z.string().trim().min(1).optional(),
   language: languageSchema.optional(),

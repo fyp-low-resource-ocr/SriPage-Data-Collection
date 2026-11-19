@@ -1761,6 +1761,9 @@ export function AdminFormWorkspace({
             <div className="panel-section">
               <h3>Selected annotation</h3>
               <div className="form-grid">
+                {isPublic && selected.label === "Signature" ? (
+                  <div className="annotation-region-note">Signature region — no text value required.</div>
+                ) : <>
                 <div className="field">
                   <AnnotationFieldLabel htmlFor="admin-annotation-text" label="Text" help="Enter the text visible inside this box. Signatures, stamps, logos, and tables may be left empty." />
                   <div className="annotation-typing-controls">
@@ -1915,6 +1918,7 @@ export function AdminFormWorkspace({
                     <p>Type consonants followed by vowels. Shift gives alternate letters. Caps Lock temporarily types English.</p>
                   </details>
                 )}
+                </>}
                 {isPublic && selected.label === "Handwritten text" && (
                   <div className="field-label-with-help">
                   <label className="annotation-blank-option">
@@ -1925,7 +1929,7 @@ export function AdminFormWorkspace({
                   <FieldHelp id="intentionally-blank-help" label="Intentionally blank" text="Use for an answer field that is deliberately empty. Clear the text first. This allows an empty handwritten box to pass download validation." />
                   </div>
                 )}
-                <div className="field">
+                <div className="field annotation-label-field">
                   <AnnotationFieldLabel htmlFor="admin-annotation-label" label="Label" help="Choose what this region contains. Its label determines the box color and whether text is required." />
                   <CustomSelect
                     id="admin-annotation-label"
@@ -1933,7 +1937,10 @@ export function AdminFormWorkspace({
                     native={!isPublic}
                     value={selected.label}
                     options={LABELS.map((label) => ({ value: label, label, color: LABEL_COLORS[label].stroke }))}
-                    onChange={(value) => updateAnnotation(selected.id, { label: value as SriPageLabel })}
+                    onChange={(value) => updateAnnotation(selected.id, {
+                      label: value as SriPageLabel,
+                      ...(isPublic && value === "Signature" ? { text: "", intentionallyBlank: undefined } : {}),
+                    })}
                   />
                 </div>
                 <div className="field">
@@ -2031,7 +2038,7 @@ export function AdminFormWorkspace({
                     <span className="admin-annotation-swatch" style={{ background: LABEL_COLORS[annotation.label].stroke }} />
                     {annotation.readingOrder}. {annotation.label}
                   </strong>
-                  <span className="annotation-language-text" lang={annotation.language ?? "si"}>{annotation.text || "(empty text)"}</span>
+                  <span className="annotation-language-text" lang={annotation.language ?? "si"}>{annotation.text || (isPublic && annotation.label === "Signature" ? "Signature region" : "(empty text)")}</span>
                 </button>
               ))}
               {!pageAnnotations.length && <p style={{ color: "var(--muted)", fontSize: 11 }}>No annotations on this page.</p>}
@@ -2055,7 +2062,7 @@ export function AdminFormWorkspace({
                           if (issue.field === "text") annotationTextRef.current?.focus();
                         });
                       }}>
-                        Page {issue.page} · Box {issue.readingOrder}: {issue.message}
+                        Page {issue.page} · Box {issue.readingOrder} ({annotations.find((annotation) => annotation.id === issue.annotationId)?.label}): {issue.message}
                       </button>
                     ))}
                   </div>
